@@ -1,6 +1,6 @@
 from pydantic import ValidationError
 from typing import Any
-from record import Networks, Record
+from .record import Networks, Record
 
 
 def parse_loggernet_json(data: dict[str, Any]) -> list[Record]:

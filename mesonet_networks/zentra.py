@@ -1,15 +1,25 @@
-from record import Record, Networks
-import json
+from .record import Record, Networks
 from typing import Any
 
-import json
 
-with open("../tests/zentra_records.json", "r") as json_file:
-    data = json.load(json_file)
-
-
-def parse_zentra_records(data: dict[str, Any]) -> list[Record]:
+def parse_zentra_json(data: dict[str, Any]) -> list[Record]:
     
-    records = []
-    for element, record in data.items():
-        ...
+    out = []
+    for element, records in data.items():
+        for record in records:
+
+            metadata = record['metadata']
+            readings = record['readings']
+            if (read_len := len(readings)) > 1:
+                raise ValueError(f"Readings has {read_len} items. Should have 1.")
+            
+            out.append(
+                Record(
+                    **metadata,
+                    **readings[0],
+                    element=element,
+                    network = Networks.ZENTRA
+                )
+            )
+    
+    return
