@@ -1,0 +1,22 @@
+services:
+    caddy:
+        container_name: caddy
+        restart: always
+        image: caddy:2.3.0
+        volumes:
+            - $PWD/caddy/Caddyfile:/etc/caddy/Caddyfile
+            - /var/opt/Loggernet/data:/var/opt/Loggernet/data
+        ports:
+            - 80:80
+
+    loggernet:
+        container_name: loggernet
+        restart: always
+        build: ./loggernet
+        ports:
+            - 6789:6789
+        secrets:
+            - SSH_KEY
+        volumes:
+            - /var/opt/Loggernet/data:/var/opt/CampbellSci/LoggerNet/data
+            - ./loggernet/scripts:/opt/
