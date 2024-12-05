@@ -3,11 +3,6 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
 EXPOSE 6789
 
-# Install loggernet
-RUN dpkg --install /opt/${LN_LINUX}
-RUN ln -s /opt/CampbellSci/LoggerNet/cora_cmd /usr/local/bin/cora_cmd
-RUN /etc/init.d/csilgrnet start
-
 # needed to run wine
 RUN dpkg --add-architecture i386
 
@@ -42,4 +37,7 @@ ENV WINEARCH=win32
 ENV WINEPATH=/home/wine/myapp 
 RUN wineboot --init
 
-CMD ["tail", "-f", "/dev/null"]
+COPY ./entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+ENTRYPOINT [ "/entrypoint.sh" ]
