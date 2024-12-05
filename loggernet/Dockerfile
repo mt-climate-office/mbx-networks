@@ -1,45 +1,45 @@
-# FROM bitnami/minideb:buster
-FROM python:3-slim-bullseye
-# MAINTAINER Kyle Bocinsky, bocinsky@gmail.com
-
-ENV SSH_KEY=""
+FROM python:3.12-bookworm
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
 EXPOSE 6789
 
-# install dependencies
+# Install loggernet
+RUN dpkg --install /opt/${LN_LINUX}
+RUN ln -s /opt/CampbellSci/LoggerNet/cora_cmd /usr/local/bin/cora_cmd
+RUN /etc/init.d/csilgrnet start
+
+# needed to run wine
+RUN dpkg --add-architecture i386
+
+# Tools needed to install wine
 RUN apt-get update && apt-get install -y \
-      curl \
-      libcurl4 \
-      zip \
-      xdg-utils \
-      htop \
-      net-tools \
-      openssh-client \
-      git \
-      cron \
-      vim \
-      rsyslog \
-      jq
+    wget \
+    xvfb \
+    coreutils
 
-RUN pip install yq
+# install wine
+RUN mkdir -pm755 /etc/apt/keyrings
+RUN wget -O /etc/apt/keyrings/winehq-archive.key https://dl.winehq.org/wine-builds/winehq.key
+RUN wget -NP /etc/apt/sources.list.d/ https://dl.winehq.org/wine-builds/debian/dists/bookworm/winehq-bookworm.sources
+RUN apt install -y --install-recommends wine
 
-## Set time zone for server
-#ENV TZ=America/Denver
-#RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
+# Install compile checker
+COPY ./scripts/check_compile.sh /opt/check_compile
+RUN chmod +x /opt/check_compile
+RUN ln -s /opt/check_compile /usr/local/bin/check_compile
 
-# Download public key for github.com
-RUN mkdir -p -m 0600 ~/.ssh && ssh-keyscan github.com >> ~/.ssh/known_hosts
+# Create wine user b/c it causes issues to run wine as root
+RUN useradd -ms /bin/bash wine && \
+    echo "wine ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
 
-COPY entrypoint.sh /entrypoint.sh
+RUN mkdir -p /opt/usr && chown -R wine:wine /opt/usr
+USER wine
 
-# Multipath fix for docker VM
-RUN echo '\
-defaults {\n\
-    user_friendly_names yes\n\
-}\n\
-blacklist {\n\
-    devnode "^(ram|raw|loop|fd|md|dm-|sr|scd|st)[0-9]*"\n\
-    devnode "^sd[a-z]?[0-9]*"\n\
-}' | tee /etc/multipath.conf
+# Configure wine
+RUN mkdir -p /home/wine/myapp/prefix
+ENV WINEPREFIX=/home/wine/myapp/prefix 
+ENV WINEARCH=win32 
+ENV WINEPATH=/home/wine/myapp 
+RUN wineboot --init
 
-ENTRYPOINT ["/entrypoint.sh"]
+CMD ["tail", "-f", "/dev/null"]
