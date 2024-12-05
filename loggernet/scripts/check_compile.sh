@@ -8,5 +8,5 @@ XVFB_PID=$!
 trap "kill $XVFB_PID > /dev/null 2>&1" EXIT
 
 # Test that the program can compile
-DISPLAY=:99 wine /opt/cr1000xcomp.exe "$1" 2> >(grep -v "X connection to :99 broken" >&2)
+DISPLAY=:99 wine /opt/ln/cr1000xcomp.exe "$1" 2> >(grep -v "X connection to :99 broken" >&2)
 kill $XVFB_PID > /dev/null 2>&1
