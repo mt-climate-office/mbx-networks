@@ -28,6 +28,14 @@ RUN ln -s /opt/check_compile /usr/local/bin/check_compile
 COPY ./entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
+RUN mkdir -p /opt/ln
+COPY $LN_SOFTWARE/$LN_VERSION /opt/ln
+COPY $LN_SOFTWARE/*.exe /opt/ln
+
+RUN dpkg --install /opt/ln/$LN_VERSION
+RUN ln -s /opt/CampbellSci/LoggerNet/cora_cmd /usr/local/bin/cora_cmd
+RUN /etc/init.d/csilgrnet start
+
 # Create wine user b/c it causes issues to run wine as root
 RUN useradd -ms /bin/bash wine && \
     echo "wine ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
