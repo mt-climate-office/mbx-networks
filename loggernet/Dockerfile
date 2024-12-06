@@ -12,7 +12,8 @@ RUN apt-get update && apt-get install -y \
     xvfb \
     coreutils \
     zip \
-    xdg-utils
+    xdg-utils \
+    sudo
 
 # install wine
 RUN mkdir -pm755 /etc/apt/keyrings
@@ -25,19 +26,14 @@ COPY ./scripts/check_compile.sh /opt/check_compile
 RUN chmod +x /opt/check_compile
 RUN ln -s /opt/check_compile /usr/local/bin/check_compile
 
-RUN mkdir -p /opt/ln
-COPY $LN_SOFTWARE/$LN_VERSION /opt/ln
-COPY $LN_SOFTWARE/*.exe /opt/ln
-
-RUN dpkg --install /opt/ln/$LN_VERSION
-RUN ln -s /opt/CampbellSci/LoggerNet/cora_cmd /usr/local/bin/cora_cmd
-RUN /etc/init.d/csilgrnet start
-
 # Create wine user b/c it causes issues to run wine as root
 RUN useradd -ms /bin/bash wine && \
     echo "wine ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
 
 RUN mkdir -p /opt/usr && chown -R wine:wine /opt/usr
 
+COPY ./entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh && chown wine:wine /entrypoint.sh
+
 USER wine
-CMD ["sleep", "infinity"]
+ENTRYPOINT [ "/entrypoint.sh" ] 
