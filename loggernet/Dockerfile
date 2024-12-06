@@ -25,9 +25,6 @@ COPY ./scripts/check_compile.sh /opt/check_compile
 RUN chmod +x /opt/check_compile
 RUN ln -s /opt/check_compile /usr/local/bin/check_compile
 
-COPY ./entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
-
 RUN mkdir -p /opt/ln
 COPY $LN_SOFTWARE/$LN_VERSION /opt/ln
 COPY $LN_SOFTWARE/*.exe /opt/ln
