@@ -6,4 +6,10 @@ sudo /etc/init.d/csilgrnet start
 
 uv sync --frozen --no-cache
 
-/app/.venv/bin/fastapi run app/main.py --port 8080 --host 0.0.0.0 --reload
+if [ "$APP_MODE" = "debug" ]; then
+    echo "Debugging"
+    python -m debugpy --listen 0.0.0.0:5678 --wait-for-client -m uvicorn main:app --host 0.0.0.0 --port 8000
+else
+    echo "Not Debugging"
+    /app/.venv/bin/fastapi run app/main.py --port 8080 --host 0.0.0.0 --reload
+fi
