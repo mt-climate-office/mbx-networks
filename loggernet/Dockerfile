@@ -32,11 +32,7 @@ RUN useradd -ms /bin/bash wine && \
 
 RUN mkdir -p /opt/usr && chown -R wine:wine /opt/usr
 
-# Copy FastAPI stuff
-COPY . /app
-
 WORKDIR /app
-RUN uv sync --frozen --no-cache
 
 COPY ./entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh && chown wine:wine /entrypoint.sh
