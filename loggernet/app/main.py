@@ -1,9 +1,46 @@
-from fastapi import FastAPI, File, UploadFile, HTTPException
+from fastapi import FastAPI, File, UploadFile, HTTPException, Depends
 from fastapi.responses import JSONResponse
 import subprocess
+from sqlalchemy.orm import Session
+import uuid
 import os
 
+from app.db import get_db, init_db, Instruments
+
 app = FastAPI()
+
+# Lifespan event to initialize the database
+@app.on_event("startup")
+def startup_event():
+    init_db()
+
+# POST endpoint to add a new record
+@app.post("/instrument/")
+def create_record(
+    long_name: str, short_name: str, data: dict, db: Session = Depends(get_db)
+):
+    record_id = str(uuid.uuid4())  # Generate a unique ID
+    new_record = Instruments(
+        id=record_id, long_name=long_name, short_name=short_name, data=data
+    )
+    db.add(new_record)
+    db.commit()
+    db.refresh(new_record)
+    return {"id": record_id, "message": "Record created successfully"}
+
+# GET endpoint to fetch a record by short_name
+@app.get("/instrument/{short_name}")
+def get_record(short_name: str, db: Session = Depends(get_db)):
+    record = db.query(Instruments).filter(Instruments.short_name == short_name).first()
+    if not record:
+        raise HTTPException(status_code=404, detail="Record not found")
+    return {
+        "id": record.id,
+        "long_name": record.long_name,
+        "short_name": record.short_name,
+        "data": record.data,
+    }
+
 
 @app.get("/")
 async def root():

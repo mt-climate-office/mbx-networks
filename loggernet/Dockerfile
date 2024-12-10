@@ -13,7 +13,8 @@ RUN apt-get update && apt-get install -y \
     coreutils \
     zip \
     xdg-utils \
-    sudo
+    sudo \
+    sqlite3
 
 # install wine
 RUN mkdir -pm755 /etc/apt/keyrings
