@@ -453,16 +453,16 @@ def parse_table(table_soup: BeautifulSoup):
 
     return table_data
 
+
 class ArgEnum(Enum):
     ...
 
-
-
 class FunctionArgument:
-    def __init__(self, name: str, description: str, options: ArgEnum | None = None, option_meta: list[str] | None):
+    def __init__(self, name: str, description: str, options: ArgEnum | None = None, option_meta: list[str] | None = None):
         self.name = name
         self.description = description
         self.options = options
+        self.option_meta = option_meta
 
 class CSIFunction:
     def __init__(self, name, *args):
