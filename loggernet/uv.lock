@@ -438,12 +438,8 @@ dependencies = [
     { name = "debugpy" },
     { name = "fastapi", extra = ["standard"] },
     { name = "httpx" },
-    { name = "sqlalchemy" },
-]
-
-[package.dev-dependencies]
-dev = [
     { name = "ipykernel" },
+    { name = "sqlalchemy" },
 ]
 
 [package.metadata]
@@ -452,11 +448,9 @@ requires-dist = [
     { name = "debugpy", specifier = ">=1.8.9" },
     { name = "fastapi", extras = ["standard"], specifier = ">=0.115.6" },
     { name = "httpx", specifier = ">=0.28.1" },
+    { name = "ipykernel", specifier = ">=6.29.5" },
     { name = "sqlalchemy", specifier = ">=2.0.36" },
 ]
-
-[package.metadata.requires-dev]
-dev = [{ name = "ipykernel", specifier = ">=6.29.5" }]
 
 [[package]]
 name = "markdown-it-py"

@@ -438,6 +438,9 @@ def parse_table(table_soup: BeautifulSoup):
 
     rows = table_soup.find_all("tr")[1:]  # Exclude the header row (first <tr>)
 
+    if len(rows) == 0:
+        return None
+    
     for row in rows:
         cols = row.find_all("td")  # Find all cells in the row
         if len(cols) > 0:
@@ -478,8 +481,10 @@ for function in all_functions:
     function_args = []
 
     for arg in args:
-        function_args = arg.find_next_sibling()
-        arg
+        description = arg.find_next_sibling()
+        table_soup = description.find_next_sibling()
+        FunctionArgument(name = arg.text, description=description)
+        
 
     csi_function = CSIFunction(
         function

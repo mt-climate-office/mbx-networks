@@ -9,6 +9,7 @@ dependencies = [
     "debugpy>=1.8.9",
     "fastapi[standard]>=0.115.6",
     "httpx>=0.28.1",
+    "ipykernel>=6.29.5",
     "sqlalchemy>=2.0.36",
 ]
 
