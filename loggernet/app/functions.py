@@ -1,7 +1,13 @@
 from bs4 import BeautifulSoup
+from bs4.element import Tag
 import httpx
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
+from textwrap import dedent
+from instruments import Variable
+import re
+
+from typing import NewType
 
 all_functions = [
     "ACPower",
@@ -18,8 +24,8 @@ all_functions = [
     "Atn",
     "Atn2",
     "AngleDegrees",
-    "ApplyandRestartSequence",
-    "EndApplyandRestartSequence",
+    # "ApplyandRestartSequence", # This is a directive
+    # "EndApplyandRestartSequence",
     "ArgosData",
     "ArgosDataRepeat",
     "ArgosError",
@@ -29,7 +35,7 @@ all_functions = [
     "AVW200",
     "ArrayIndex",
     "Battery",
-    "BeginBurstTrigger",
+    # "BeginBurstTrigger",
     "BrFull",
     "BrFull6W",
     "BrHalf",
@@ -39,8 +45,8 @@ all_functions = [
     "CalFile",
     "Calibrate",
     "CHR",
-    "CPIAddModule",
-    "CPIFileSend",
+    # "CPIAddModule",
+    # "CPIFileSend",
     "CDM_ACPower",
     "CDM_Battery",
     "CDM_BrFull",
@@ -311,8 +317,8 @@ all_functions = [
     "SDMTrigger",
     "SDMX50",
     "SecsSince1990",
-    "SemaphoreGet",
-    "SemaphoreRelease",
+    # "SemaphoreGet",
+    # "SemaphoreRelease",
     "SendData",
     "SendFile",
     "SendTableDef",
@@ -332,8 +338,8 @@ all_functions = [
     "SetSecurity",
     "SetStatus",
     "SetSetting",
-    "ShutDownBegin",
-    "ShutDownEnd",
+    # "ShutDownBegin", This is a directive
+    # "ShutDownEnd",
     "Signature",
     "SNMPVariable",
     "StaticRoute",
@@ -356,12 +362,11 @@ all_functions = [
     "TCDiff",
     "TCPClose",
     "TCPOpen",
-    "TCPsyc",
     "TGA",
     "Therm109",
     "Therm108",
     "Therm107",
-    "Thermistor",
+    # "Thermistor",
     "TimedControl",
     "TimeIsBetween",
     "Timer",
@@ -382,26 +387,26 @@ all_functions = [
     "RTrim",
     "UDPDataGram",
     "UDPOpen",
-    "Until",
+    # "Until",
     "UpperCase",
     "PakBusClock",
     "VaporPressure",
-    "VibratingWire",
-    "VoiceSetup",
-    "VoiceSpeak",
-    "VoiceBeg",
-    "EndVoice",
-    "VoiceKey",
-    "VoiceNumber",
-    "VoicePhrases",
-    "VoiceHangup",
+    # "VibratingWire",
+    # "VoiceSetup",
+    # "VoiceSpeak",
+    # "VoiceBeg",
+    # "EndVoice",
+    # "VoiceKey",
+    # "VoiceNumber",
+    # "VoicePhrases",
+    # "VoiceHangup",
     "VoltSE",
     "VoltDiff",
     "WaitDigTrig",
-    "WaitTriggerSequence",
-    "TriggerSequence",
-    "WebPageBegin",
-    "WebPageEnd",
+    # "WaitTriggerSequence",
+    # "TriggerSequence",
+    # "WebPageBegin",
+    # "WebPageEnd",
     "WetDryBulb",
     "WorstCase",
     "WriteIO",
@@ -413,8 +418,6 @@ all_functions = [
     "CurrentSE",
     "Matrix",
     "Gzip",
-    "GOESCommand",
-    "GOESCommand",
     "StructureType",
     "Quadrature",
     "SMSRecv",
@@ -426,67 +429,237 @@ all_functions = [
     "MQTTPublishConstTable",
 ]
 
-# URL to scrape
 URL = "https://help.campbellsci.com/crbasic/cr1000x"
+Constant = NewType("Constant", int)
+Expression = NewType("Expression", str)
+Array = NewType("Array", Variable)
+Integer = NewType("Integer", int)
+ConstantInteger = NewType("ConstantInteger", int)
 
-class TableEnum(Enum):
+
+TYPES = ["Variable", "Constant", "Expression", "Array", "Integer", "ConstantInteger"]
+
+class ArgEnum(Enum):
     pass
 
-def parse_table(table_soup: BeautifulSoup):
 
-    table_data = {}  # Dictionary to store data in the form {Enum: [column2, column3, ...]}
+@dataclass
+class ArgOptions:
+    choices: str | int
+    description: str
 
-    rows = table_soup.find_all("tr")[1:]  # Exclude the header row (first <tr>)
+
+def parse_table(table_soup: BeautifulSoup) -> list[ArgOptions]:
+    rows = table_soup.find_all("tr")[1:]  
 
     if len(rows) == 0:
         return None
     
+    options = []
+
     for row in rows:
-        cols = row.find_all("td")  # Find all cells in the row
+        cols = row.find_all("td")  
         if len(cols) > 0:
-            option = cols[0].text.strip()  # First column: Option (Enum key)
-            other_data = [col.decode_contents().strip() for col in cols[1:]]  # Other columns
-            
-            # Create an Enum entry dynamically
-            enum_name = f"OPTION_{option}"  # Enum names like OPTION_1, OPTION_2, etc.
-            setattr(TableEnum, enum_name, int(option))  # Add to the Enum
-            
-            # Store other column data in the dictionary
-            table_data[getattr(TableEnum, enum_name)] = other_data
 
-    return table_data
+            options.append(ArgOptions(
+                cols[0].text.strip().split(" ")[0],
+                cols[1].text.strip()
+            ))
+
+    return options
 
 
-class ArgEnum(Enum):
-    ...
-
+@dataclass
 class FunctionArgument:
-    def __init__(self, name: str, description: str, options: ArgEnum | None = None, option_meta: list[str] | None = None):
-        self.name = name
-        self.description = description
-        self.options = options
-        self.option_meta = option_meta
+    name: str
+    short_name: str
+    description: str
+    type: list[str] = None
+    options: list[ArgOptions] | None = None
+
+    def __post_init__(self):
+        if self.type is None:
+            self.type = ["Constant"]
+
+
+def clean_string(s: str):
+    s = s.replace('\xa0', ' ')
+    s = s.replace('\r', '')
+    s = s.replace('\n', '')
+    return s
 
 class CSIFunction:
-    def __init__(self, name, *args):
+    def __init__(self, *args: FunctionArgument, name: str, source: str, remarks: str):
         self.name = name
+        self.source = source
+        self.remarks = remarks
         self.args = args
+    
+    def __str__(self):
 
-function = "BrFull"
+        args = ", ".join(
+            f"{obj.short_name}: {'Literal[' + ', '.join(f'"{x.choices}"' for x in obj.options) + ']' if obj.options is not None else ' | '.join(obj.type)}" 
+            if hasattr(obj, 'type') else obj.short_name 
+            for obj in self.args
+        )
+        return_args = f"{','.join([f'{{{x.short_name}}}' for x in self.args])}"
+        arg_descriptions = "\n\t\t".join(
+            f"{obj.short_name} ({' | '.join(obj.type)}): {obj.description}" + 
+            (f"\n\t\t  Must be one of following options: {', '.join(f'{x.choices} ({x.description})' for x in obj.options)}\n" if obj.options is not None else "\n")
+            for obj in self.args
+        )
+        return dedent(f'''
+        def {self.name}({args}) -> str:
+            """For a full description of this function, visit [{self.source}]({self.source}).
+            
+            {self.remarks}
+            
+            Args:
+                {arg_descriptions}
+            Returns:
+                str: A string of the CRBasic function call.
+            """
+            return f"{self.name}({return_args})"
+        ''')
+
+
+def get_meta(description: Tag) -> str:
+    meta = {
+        "table": None,
+        "type": None,
+        "description": []
+    }
+
+    description = arg
+    while 'PopupHeadingTopic' not in (description := description.find_next_sibling()).get("class", []):
+        if description.name == "h2":
+            break
+        if description.name == "table":
+            table = parse_table(description)
+            meta['table'] = table
+        elif description.text.startswith("Type:"):
+            types = [x for x in TYPES if x in description.text]
+            meta['type'] = types
+        else:
+            meta['description'].append(clean_string(description.text))
+
+        if description.find_next_sibling() is None:
+            break
+    
+    return meta
+
+
+def get_remarks(soup: BeautifulSoup):
+    remarks_tag = soup.find(string="Remarks")
+    if remarks_tag is None:
+        return ""
+    description = remarks_tag.find_parent()
+    out = []
+    while (description := description.find_next_sibling()).name != "h2":
+        if description.find_next_sibling() is None:
+            break
+        if description.find_previous_sibling().find("img"):
+            continue
+        if description.name == "p":
+            out.append(clean_string(description.text))
+        
+
+    if len(out) == 0:
+        return ""
+
+    out = [x.strip() for x in out]
+    out = [x for x in out if x != '']
+    out = [x for x in out if len(x) > 25]
+    out = [x.replace ("\n", " ") for x in out]
+    return "\n".join(out)
+
+fun_def = []
 for function in all_functions:
-    url = f"{URL}/Content/Instructions/{function.lower()}.htm"
+    if "Therm10" in (url_str := function):
+        strs = ["therm107", "therm108", "therm109"]
+        if "CDM" in url_str:
+            strs = [f"cdm{x}" for x in strs]
+        url_str = "".join(strs)
+    if url_str in ["SetStatus", "SetSetting", "SetSettings"]:
+        url_str = "setstatussetsetting"
+    url = f"{URL}/Content/Instructions/{url_str.lower().replace("_", "")}.htm"
+
+    retries = 0
     request = httpx.get(url, follow_redirects=True)
+    while request.status_code == 404 and retries < 10:
+        new_url = f"{url_str}{retries+1}"
+        url =  f"{URL}/Content/Instructions/{new_url.lower().replace("_", "")}.htm"
+        retries += 1
+
+    if request.status_code == 404:
+        print(f"404 Status Code: {url}")
+        continue
+
+    print(url)
     soup = BeautifulSoup(request.text, "html.parser")
     args = soup.find_all(class_="PopupHeadingTopic")
     function_args = []
 
     for arg in args:
-        description = arg.find_next_sibling()
-        table_soup = description.find_next_sibling()
-        FunctionArgument(name = arg.text, description=description)
-        
+        meta = get_meta(arg)
+        name = clean_string(arg.text)
+        short_name = re.sub(r' \(.*\)$', '', name)
+
+        if "," in short_name:
+            new_args = short_name.split(", ")
+            for n in new_args:
+                function_args.append(
+                    FunctionArgument(
+                        name = n,
+                        short_name=n,
+                        description=" ".join(meta['description']),
+                        type=meta['type'],
+                        options=meta['table'],
+                    )
+                )
+        else: 
+            function_args.append(
+                FunctionArgument(
+                    name = clean_string(arg.text), 
+                    short_name = short_name,
+                    description=" ".join(meta['description']),
+                    type=meta['type'],
+                    options=meta['table'],
+                )
+            )
+
+    if len(function_args) == 0:
+        syntax = soup.find(string="Syntax").find_parent().find_next_sibling().text
+        try:
+            fun_args = re.findall(r'\((.*?)\)', syntax)[0].replace(" ", "").split(",") 
+        except IndexError:
+            # This happens when there are no args (it is a declaration rather than a function).
+            continue
+        for x in fun_args:
+            function_args.append(
+                FunctionArgument(
+                    name = x,
+                    short_name = x,
+                    description = f"{x} (No description provided)",
+                    type = TYPES,
+                )
+            )
 
     csi_function = CSIFunction(
-        function
+        *function_args,
+        name=function,
+        remarks=get_remarks(soup),
+        source=url,
     )
-    
+
+    fun_def.append(csi_function)
+
+# import pickle
+
+
+# with open("./data.pickle", "rb") as p:
+#     test = pickle.load(p)
+
+with open("./all_functions.py", "w") as file:
+    for fun in fun_def:
+        file.write(str(fun) + '\n')

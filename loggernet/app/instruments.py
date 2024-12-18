@@ -138,49 +138,49 @@ class Instrument:
         ...
 
 
-RMYoung_05108_74 = Instrument(
-    manufacturer="RM Young",
-    model=" 05108-74",
-    type="Wind",
-    wiring=WiringDiagram(
-        Wire("Red", "P1", "WS Signal      WS SIG"),
-        Wire("White", "VX2", "WD Excite      WD EXC"),
-        Wire("Green", "SE7", "WD Signal      WD SIG"),
-        Wire("Black", "AG", "Signal G       WD REF"),
-        Wire("Brown", "G", "Earth G        GND*"),
-        description="* NOTE: Ground to EARTH in junction box directly to mast",
-    ),
-    variables=list(
-        Variable("WS_offset", "Const", 0),
-        Variable("WS_multiplier", "Const", 0.1666),
-        Variable("wind_spd", "Public", units="m s-1"),
-        Variable("wind_dir", "Public", units="arcdeg"),
-        Variable("wind_timer", "Public", units="sec"),
-    ),
-    tables=list(
-        Table(
-            "FiveMin",
-            TableItem(
-                "WindVector",
-                list(
-                    Variable("wind_spd"), Variable("wind_dir"), Variable("wind_dir_sd")
-                ),
-                1,
-                Variable("wind_spd"),
-                Variable("wind_dir"),
-                "FP2",
-                False,
-                0,
-                0,
-                0,
-            ),
-            TableItem("Maximum", "windgust", 1, "wind_spd", "FP2", False, False),
-            trig_var=True,
-            size=-1,
-            data_interval=DataInterval(),
-            card_out=CardOut(),
-        ),
-        Table("StatusReport", TableItem()),
-    ),
-)
+# RMYoung_05108_74 = Instrument(
+#     manufacturer="RM Young",
+#     model=" 05108-74",
+#     type="Wind",
+#     wiring=WiringDiagram(
+#         Wire("Red", "P1", "WS Signal      WS SIG"),
+#         Wire("White", "VX2", "WD Excite      WD EXC"),
+#         Wire("Green", "SE7", "WD Signal      WD SIG"),
+#         Wire("Black", "AG", "Signal G       WD REF"),
+#         Wire("Brown", "G", "Earth G        GND*"),
+#         description="* NOTE: Ground to EARTH in junction box directly to mast",
+#     ),
+#     variables=list(
+#         Variable("WS_offset", "Const", 0),
+#         Variable("WS_multiplier", "Const", 0.1666),
+#         Variable("wind_spd", "Public", units="m s-1"),
+#         Variable("wind_dir", "Public", units="arcdeg"),
+#         Variable("wind_timer", "Public", units="sec"),
+#     ),
+#     tables=list(
+#         Table(
+#             "FiveMin",
+#             TableItem(
+#                 "WindVector",
+#                 list(
+#                     Variable("wind_spd"), Variable("wind_dir"), Variable("wind_dir_sd")
+#                 ),
+#                 1,
+#                 Variable("wind_spd"),
+#                 Variable("wind_dir"),
+#                 "FP2",
+#                 False,
+#                 0,
+#                 0,
+#                 0,
+#             ),
+#             TableItem("Maximum", "windgust", 1, "wind_spd", "FP2", False, False),
+#             trig_var=True,
+#             size=-1,
+#             data_interval=DataInterval(),
+#             card_out=CardOut(),
+#         ),
+#         Table("StatusReport", TableItem()),
+#     ),
+# )
 # Maximum(1,wind_spd_{elevation},FP2,False,False):FieldNames ("windgust_{elevation}")
