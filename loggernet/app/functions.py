@@ -1,5 +1,29 @@
 from typing import NewType, Literal
-from instruments import Variable
+from dataclasses import dataclass
+
+@dataclass
+class Variable:
+    name: str
+    type: Literal["Public", "Const", "Dim", "Alias"] | None = None
+    value: str | int | float | None = None
+    units: str | None = None
+    table_only: bool = False
+
+    def __post_init__(self):
+        if self.type == "Const" and self.value is None:
+            raise ValueError("When defining a Const type, value must not be none.")
+
+    def __str__(self):
+        if self.type is not None:
+            out = f"{self.type} {self.name}"
+            if self.type == "Const":
+                out = f"{out} = {self.value}"
+
+            if self.units is not None:
+                out = f"{out} : Units {self.name} = {self.units}"
+
+            return out
+        return self.name
 
 Constant = NewType("Constant", int)
 Expression = NewType("Expression", str)
@@ -5086,7 +5110,7 @@ def FileOpen(
         '"ab"',
         '"a+"',
         '"a+b"',
-        "\“d\”",
+        '"d"',
         '"r"',
         '"rb"',
         '"r+"',
@@ -7911,14 +7935,18 @@ def PulsePort(
 # Public Array (2,3) = {1,2,3,4}
 # Dim Array (2,3) = {1,2,3,4}
 # If the array is not fully initialized, the first elements will be initialized first, and the remainder will be uninitialized.
-# For large arrays, initialization of variables can be placed on multiple lines as long as the break is after a , (comma).
+# For large arrays, initialization of variables can be placed on multiple
+# lines as long as the break is after a , (comma).
 
 #             Args:
-#                 size (Variable | Constant | Expression | Array | Integer | ConstantInteger): size (No description provided)
+# size (Variable | Constant | Expression | Array | Integer |
+# ConstantInteger): size (No description provided)
 
-#         size (Variable | Constant | Expression | Array | Integer | ConstantInteger): size (No description provided)
+# size (Variable | Constant | Expression | Array | Integer |
+# ConstantInteger): size (No description provided)
 
-#         size (Variable | Constant | Expression | Array | Integer | ConstantInteger): size (No description provided)
+# size (Variable | Constant | Expression | Array | Integer |
+# ConstantInteger): size (No description provided)
 
 #             Returns:
 #                 str: A string of the CRBasic function call.
@@ -10681,7 +10709,7 @@ def Totalize(
     Reps: Constant,
     Source: Variable,
     DataType: Literal[
-        "String", "Boolean", "BOOL8", "Long", "NSEC", "UINT1", "UINT2", "UINT4"
+        "IEEE4", "FP2", "IEEE8", "String", "Boolean", "BOOL8", "Long", "NSEC", "UINT1", "UINT2", "UINT4"
     ],
     DisableVar: Variable | Constant | Expression,
 ) -> str:
