@@ -1,57 +1,40 @@
-class V:
-    def __init__(self, name: str):
-        self.name = name
-
-    def __str__(self):
-        return self.name
-
-
-class S:
-    def __init__(self, content: str):
-        self.content = content
-
-    def __str__(self):
-        return f'"{self.content}"'
-
-
-class F:
-    """_summary_"""
-
-    def __init__(self, name: str, *args: list[str, int, float]):
-        self.name = name
-        self.args = args
-
-    def __str__(self):
-        return f"{self.name}({','.join(str(x) for x in self.args)})"
+from functions import Variable
 
 
 class If:
-    def __init__(self, *args: str | int | float | V, logic: str):
-        self.initial_condition = self._join_if_logic(*args)
+    def __init__(self, *args: str | int | float | Variable, logic: str | list[str]):
+        self.initial_condition = self._join_if_logic(*args, is_initial=True)
         self.else_ifs = []
         self.else_logic = None
         self.logic = logic
 
     @staticmethod
-    def _join_if_logic(*args: str | int | float | V | S, is_initial: bool = True):
-        args = []
+    def _join_if_logic(*args: str | int | float | Variable, is_initial: bool = True):
         if is_initial:
             return f"If {' '.join(str(x) for x in args)} Then"
         return f"ElseIf {' '.join(str(x) for x in args)} Then"
 
-    def ElseIf(self, *args: str | int | float, logic: str):
+    def ElseIf(self, *args: str | int | float, logic: str | list[str]):
+        if isinstance(logic, str):
+            logic = [logic]
         self.else_ifs.append(
-            f"{self._join_if_logic(*args, is_initial=False)}\n    {logic}"
+            f"{self._join_if_logic(*args, is_initial=False)}\n{"\n    ".join(x for x in logic)}"
         )
         return self
 
-    def Else(self, logic):
+    def Else(self, logic: str | list[str]):
+        if isinstance(logic, str):
+            logic = [logic]
+        logic = "\n    ".join(x for x in logic)
         self.else_logic = f"Else\n    {logic}"
         return self
 
     def __str__(self):
         code = [self.initial_condition]
-        code.append(f"    {self.logic}")
+        if isinstance(self.logic, str):
+            self.logic = [self.logic]
+
+        code.append(f"    {'\n    '.join(x for x in self.logic)}")
 
         for elseif in self.else_ifs:
             code.append(elseif)
@@ -65,7 +48,12 @@ class If:
 
 class For:
     def __init__(
-        self, logic: str, v: V, start: int | V, end: int | V, step: int | None = None
+        self,
+        logic: str,
+        v: Variable,
+        start: int | Variable,
+        end: int | Variable,
+        step: int | None = None,
     ):
         self.logic = logic
         self.v = v

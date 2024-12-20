@@ -1,10 +1,19 @@
 from typing import NewType, Literal
 from dataclasses import dataclass
+from enum import Enum
+
+
+class VarType(Enum):
+    PUBLIC = "Public"
+    CONST = "Const"
+    DIM = "Dim"
+    ALIAS = "Alias"
+
 
 @dataclass
 class Variable:
     name: str
-    type: Literal["Public", "Const", "Dim", "Alias"] | None = None
+    type: VarType | None = None
     value: str | int | float | None = None
     units: str | None = None
     table_only: bool = False
@@ -14,6 +23,9 @@ class Variable:
             raise ValueError("When defining a Const type, value must not be none.")
 
     def __str__(self):
+        return self.name
+
+    def declaration_str(self):
         if self.type is not None:
             out = f"{self.type} {self.name}"
             if self.type == "Const":
@@ -24,6 +36,7 @@ class Variable:
 
             return out
         return self.name
+
 
 Constant = NewType("Constant", int)
 Expression = NewType("Expression", str)
@@ -10709,7 +10722,17 @@ def Totalize(
     Reps: Constant,
     Source: Variable,
     DataType: Literal[
-        "IEEE4", "FP2", "IEEE8", "String", "Boolean", "BOOL8", "Long", "NSEC", "UINT1", "UINT2", "UINT4"
+        "IEEE4",
+        "FP2",
+        "IEEE8",
+        "String",
+        "Boolean",
+        "BOOL8",
+        "Long",
+        "NSEC",
+        "UINT1",
+        "UINT2",
+        "UINT4",
     ],
     DisableVar: Variable | Constant | Expression,
 ) -> str:

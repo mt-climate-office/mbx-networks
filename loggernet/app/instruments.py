@@ -1,11 +1,13 @@
+from __future__ import annotations
+
 from dataclasses import dataclass, field
 import functions
 from functions import Variable
 from typing import Literal
-from abc import abstractmethod, ABC
-from types import SimpleNamespace
+from abc import ABC
 from enum import Enum
 import operators as op
+
 
 @dataclass
 class TableItem:
@@ -18,6 +20,9 @@ class CardOut:
     StopRing: Literal[0, 1] = 0
     Size: int = -1
 
+    def __eq__(self, other: CardOut):
+        return self.StopRing == other.StopRing and self.Size == other.Size
+
 
 @dataclass
 class DataInterval:
@@ -25,6 +30,14 @@ class DataInterval:
     Interval: int = 5
     Units: str = "min"
     Lapses: int = 10
+
+    def __eq__(self, other: DataInterval):
+        return (
+            self.TIntoInt == other.TIntoInt
+            and self.Interval == other.Interval
+            and self.Units == other.Units
+            and self.Lapses == other.Lapses
+        )
 
 
 class Table:
@@ -51,30 +64,43 @@ class Table:
             s += f"    {str(self.card_out)}\n"
 
         for item in self.args:
-            s += f"\n{str(item)}"
+            s += f"\n    {str(item)}"
+
+        s += "\nEndTable"
+
+        return s
+
+    def __eq__(self, other: Table):
+        return (
+            self.name == other.name
+            and self.trig_var == other.trig_var
+            and self.size == other.size
+            and self.data_interval == other.data_interval
+            and self.card_out == other.card_out
+        )
 
 
 class WireOptions(Enum):
-    P1="P1"
-    P2="P2"
-    P3="P3"
-    P4="P4"
-    P5="P5"
-    P6="P6"
-    P7="P7"
-    VX1="Vx1"
-    VX2="Vx2",
-    SE1="1"
-    SE2="2"
-    SE3="3"
-    SE4="4"
-    SE5="5"
-    SE6="6"
-    SE7="7"
-    SE8="8"
-    SE9="9"
-    AG="AG"
-    G="G"
+    P1 = "P1"
+    P2 = "P2"
+    P3 = "P3"
+    P4 = "P4"
+    P5 = "P5"
+    P6 = "P6"
+    P7 = "P7"
+    VX1 = "Vx1"
+    VX2 = "Vx2"
+    SE1 = "1"
+    SE2 = "2"
+    SE3 = "3"
+    SE4 = "4"
+    SE5 = "5"
+    SE6 = "6"
+    SE7 = "7"
+    SE8 = "8"
+    SE9 = "9"
+    AG = "AG"
+    G = "G"
 
 
 @dataclass
@@ -97,13 +123,14 @@ class WiringDiagram:
         if self.description is not None:
             out += f"\n'{self.description}\n"
         return out
-    
-    def __getitem__(self, item) -> str:
-        # TODO: Make this based on the port rather than name.
-        out = [x for x in self.args if x.wire == item]
-        assert len(out) == 1, f"Error: More than one wire named {item}."
-        out = out[1]
-        return out.port.value
+
+    def __getitem__(self, item: str) -> str:
+        for wire in self.args:
+            if wire.wire.lower() == item.lower():
+                return item
+
+        raise KeyError(f"No wire with color {item} found.")
+
 
 @dataclass
 class Instrument(ABC):
@@ -111,46 +138,35 @@ class Instrument(ABC):
     model: str = field(init=False)
     type: str = field(init=False)
     wires: WiringDiagram = field(init=False, default=None)
-    variables: SimpleNamespace | dict[str, Variable] | list[Variable] = field(init=False)
+    variables: list[Variable] | dict[str, Variable] = field(init=False, default=None)
 
     elevation: int | None = None
     sdi12_address: str | None = None
 
     def __post_init__(self):
-        if isinstance(self.variables, dict):
-            self.variables = SimpleNamespace(**self.variables)
         if isinstance(self.variables, list):
-            self.variables = SimpleNamespace(
-                **{
-                    x.name: x for x in self.variables
-                }
-            )
-    @abstractmethod
+            self.variables = {x.name: x for x in self.variables}
+
     def update_var_names(self):
         raise NotImplementedError("Method not implemented...")
 
-    @property 
-    @abstractmethod
+    @property
     def tables(self):
         raise NotImplementedError("Method not implemented...")
-    
-    @property 
-    @abstractmethod
+
+    @property
     def pre_scan(self):
         raise NotImplementedError("Method not implemented...")
-    
-    @property 
-    @abstractmethod
+
+    @property
     def funcs(self):
         raise NotImplementedError("Method not implemented...")
-    
-    @property 
-    @abstractmethod
+
+    @property
     def program(self):
         raise NotImplementedError("Method not implemented...")
-    
-    @property 
-    @abstractmethod
+
+    @property
     def slow_sequence(self):
         raise NotImplementedError("Method not implemented...")
 
@@ -163,44 +179,53 @@ class RMYoung_05108_77(Instrument):
         self.wires = WiringDiagram(
             Wire("Red", WireOptions.P1, "WS Signal      WS SIG"),
             Wire("White", WireOptions.VX2, "WD Excite      WD EXC"),
-            Wire("Green", "SE7", "WD Signal      WD SIG"),
-            Wire("Black", "AG", "Signal G       WD REF"),
-            Wire("Brown", "G", "Earth G        GND*"),
+            Wire("Green", WireOptions.SE7, "WD Signal      WD SIG"),
+            Wire("Black", WireOptions.AG, "Signal G       WD REF"),
+            Wire("Brown", WireOptions.G, "Earth G        GND*"),
             description="* NOTE: Ground to EARTH in junction box directly to mast",
         )
-        self.variables =list(
+        self.variables = [
             Variable("WS_offset", "Const", 0),
             Variable("WS_multiplier", "Const", 0.1666),
             Variable("wind_spd", "Public", units="m s-1"),
             Variable("wind_dir", "Public", units="arcdeg"),
             Variable("wind_timer", "Public", units="sec"),
             Variable("wind_dir_sd", table_only=True),
-            Variable("windgust", table_only=True)
-        ), 
+            Variable("windgust", table_only=True),
+        ]
         return super().__post_init__()
 
+    @property
     def tables(self) -> list[Table]:
-        return list(
+        return [
             Table(
                 "FiveMin",
                 TableItem(
                     functions.WindVector(
                         1,
-                        self.variables.wind_spd,
-                        self.variables.wind_dir,
+                        self.variables["wind_spd"],
+                        self.variables["wind_dir"],
                         "FP2",
                         False,
                         0,
                         0,
-                        0
+                        0,
                     ),
-                    field_names=list(self.variables.wind_spd, self.variables.wind_dir, self.variables.wind_dir_sd)
+                    field_names=[
+                        self.variables["wind_spd"],
+                        self.variables["wind_dir"],
+                        self.variables["wind_dir_sd"],
+                    ],
                 ),
                 TableItem(
                     functions.Maximum(
-                        1, self.variables.wind_spd, "FP2", False, False,
+                        1,
+                        self.variables["wind_spd"],
+                        "FP2",
+                        False,
+                        False,
                     ),
-                    field_names=list(self.variables.wind_timer)
+                    field_names=[self.variables["wind_timer"]],
                 ),
                 size=-1,
                 data_interval=DataInterval(),
@@ -209,18 +234,55 @@ class RMYoung_05108_77(Instrument):
             Table(
                 "StatusReport",
                 TableItem(
-                    functions.Totalize(
-                        1, self.variables.wind_timer, "IEEE4", False 
-                    ),
-                    field_names=list(self.variables.wind_timer)
-                )
-            )
-        )
+                    functions.Totalize(1, self.variables["wind_timer"], "IEEE4", False),
+                    field_names=[self.variables["wind_timer"]],
+                ),
+                size=-1,
+                card_out=CardOut(),
+                data_interval=DataInterval(0, 120, "min", 10),
+            ),
+        ]
 
+    @property
     def program(self):
-        return list(
-            functions.BrHalf(self.variables.wind_dir, 1, 'mV5000', self.wires["Green"], self.wires["White"],1, 2500, True, 0, "60", 355, 0),
-            # TODO: Pulsecount
-            op.If(self.variables.wind_spd, "<=", logic="")
+        return "\n".join(
+            str(x)
+            for x in [
+                functions.BrHalf(
+                    self.variables["wind_dir"],
+                    1,
+                    "mV5000",
+                    self.wires["Green"],
+                    self.wires["White"],
+                    1,
+                    2500,
+                    True,
+                    0,
+                    "60",
+                    355,
+                    0,
+                ),
+                functions.PulseCount(
+                    self.variables["wind_spd"],
+                    1,
+                    self.wires["Red"],
+                    "5",
+                    "1",
+                    self.variables["WS_multiplier"],
+                    self.variables["WS_offset"],
+                ),
+                op.If(
+                    self.variables["wind_spd"],
+                    "<=",
+                    0,
+                    logic=[
+                        f"{self.variables['wind_dir']} = NAN",
+                        f"{self.variables['wind_timer']} = 3",
+                    ],
+                ).Else(f"{self.variables['wind_timer']} = 0"),
+            ]
         )
 
+
+test = RMYoung_05108_77()
+print(test.program)
