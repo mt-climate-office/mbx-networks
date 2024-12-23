@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 import functions
-from functions import Variable, VarType
+from functions import Variable, VarType, DataType
 from typing import Literal
 from abc import ABC
 from enum import Enum
@@ -107,6 +107,7 @@ class WireOptions(Enum):
     SE8 = "8"
     SE9 = "9"
     AG = "AG"
+    RG2 = "RG2"
     G = "G"
     _12V = "12V"
 
@@ -330,5 +331,22 @@ class Setra_CS100(Instrument):
             f"{self.variables["bp"]} = {self.variables["bp"]}*0.1"
         ]
     )
-test = RMYoung_05108_77()
-print(test.program)
+        
+class Vaisala_HMP155(Instrument):
+    def __post_init__(self):
+        self.model = "HMP-155 (RS-485)"
+        self.manufacturer = "Vaisala"
+        self.type = "RH/T"
+
+        self.wires = WiringDiagram(
+            Wire("Brown", WireOptions.C7, "RS485 B"),
+            Wire("Pink", WireOptions.C8, "RS485 A"),
+            Wire("Red", WireOptions.RG2),
+            Wire("Blue", WireOptions._12V, "12V Power"),
+            Wire("Black/Clear", WireOptions.AG)
+        )
+
+        self.variables = [
+            Variable("rhtemp(2)", VarType.PUBLIC, DataType.FLOAT)
+        ]
+        return super().__post_init__()

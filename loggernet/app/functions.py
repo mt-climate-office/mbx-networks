@@ -1,6 +1,7 @@
 from typing import NewType, Literal
 from dataclasses import dataclass
 from enum import Enum
+import re
 
 
 class VarType(Enum):
@@ -9,27 +10,56 @@ class VarType(Enum):
     DIM = "Dim"
     ALIAS = "Alias"
 
+class DataType(Enum):
+    FLOAT = "Float"
+    BOOLEAN = "Boolean"
+    LONG = "Long"
+    STRING = "String"
+
+    @classmethod
+    def _missing_(cls, value):
+
+        if isinstance(value, str) and re.match(r"^String\d+$", value):
+            length = int(value[6:]) 
+            member = object.__new__(cls)
+            member._value_ = value
+            member.length = length
+            return member
+        
+        return None
+    
+    def __str__(self):
+        return self.value
+
 
 @dataclass
 class Variable:
     name: str
-    type: VarType | None = None
+    var_type: VarType | None = None
+    data_type: DataType | None = None
     value: str | int | float | None = None
     units: str | None = None
     table_only: bool = False
 
     def __post_init__(self):
-        if self.type == "Const" and self.value is None:
+        if self.var_type == "Const" and self.value is None:
             raise ValueError("When defining a Const type, value must not be none.")
 
     def __str__(self):
         return self.name
 
     def declaration_str(self):
-        if self.type is not None:
-            out = f"{self.type} {self.name}"
-            if self.type == "Const":
+        if self.var_type is not None:
+            out = f"{self.var_type} {self.name}"
+            if self.var_type == "Const":
                 out = f"{out} = {self.value}"
+        
+            if self.data_type is not None:
+                try: 
+                    length = self.data_type.length
+                    out = f"{out} as {self.data_type.value} * {length}"
+                except AttributeError:
+                    out = f"{out} as {self.data_type.value}"
 
             if self.units is not None:
                 out = f"{out} : Units {self.name} = {self.units}"
