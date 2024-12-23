@@ -189,7 +189,7 @@ def Average(
     Reps: Constant,
     Source: Variable,
     DataType: Literal[
-        "String", "Boolean", "BOOL8", "Long", "NSEC", "UINT1", "UINT2", "UINT4"
+    "IEEE4", "String", "Boolean", "BOOL8", "Long", "NSEC", "UINT1", "UINT2", "UINT4"
     ],
     DisableVar: Variable | Constant | Expression,
 ) -> str:

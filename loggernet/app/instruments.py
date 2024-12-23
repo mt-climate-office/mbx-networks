@@ -2,13 +2,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 import functions
-from functions import Variable
+from functions import Variable, VarType
 from typing import Literal
 from abc import ABC
 from enum import Enum
 import operators as op
 
-
+field()
 @dataclass
 class TableItem:
     func: str
@@ -81,6 +81,13 @@ class Table:
 
 
 class WireOptions(Enum):
+    C1 = "C1"
+    C2 = "C2"
+    C3 = "C3"
+    C4 = "C4"
+    C5 = "C5"
+    C6 = "C6"
+    C7 = "C7"
     P1 = "P1"
     P2 = "P2"
     P3 = "P3"
@@ -101,6 +108,7 @@ class WireOptions(Enum):
     SE9 = "9"
     AG = "AG"
     G = "G"
+    _12V = "12V"
 
 
 @dataclass
@@ -185,11 +193,11 @@ class RMYoung_05108_77(Instrument):
             description="* NOTE: Ground to EARTH in junction box directly to mast",
         )
         self.variables = [
-            Variable("WS_offset", "Const", 0),
-            Variable("WS_multiplier", "Const", 0.1666),
-            Variable("wind_spd", "Public", units="m s-1"),
-            Variable("wind_dir", "Public", units="arcdeg"),
-            Variable("wind_timer", "Public", units="sec"),
+            Variable("WS_offset", VarType.CONST, 0),
+            Variable("WS_multiplier", VarType.CONST, 0.1666),
+            Variable("wind_spd", VarType.PUBLIC, units="m s-1"),
+            Variable("wind_dir", VarType.PUBLIC, units="arcdeg"),
+            Variable("wind_timer", VarType.PUBLIC, units="sec"),
             Variable("wind_dir_sd", table_only=True),
             Variable("windgust", table_only=True),
         ]
@@ -244,7 +252,7 @@ class RMYoung_05108_77(Instrument):
         ]
 
     @property
-    def program(self):
+    def program(self) -> str:
         return "\n".join(
             str(x)
             for x in [
@@ -283,6 +291,44 @@ class RMYoung_05108_77(Instrument):
             ]
         )
 
+class Setra_CS100(Instrument):
+    def __post_init__(self):
+        self.manufacturer = "Setra"
+        self.model = "CS100"
+        self.type = "Barometer"
 
+        self.wires = WiringDiagram(
+            Wire("Blue", WireOptions.SE2, "Signal H"),
+            Wire("Yellow", WireOptions.AG, "Signal G"),
+            Wire("Clear", WireOptions.AG, "Signal G"),
+            Wire("Red", WireOptions._12V, "12v Power"),
+            Wire("Black", WireOptions.G, "Power Ground"),
+            WireOptions("Green", WireOptions.C2, "Control")
+        )
+        self.variables = [
+            Variable("bp", VarType.PUBLIC, units="kPa")
+        ]
+        return super().__post_init__()
+
+    @property
+    def tables(self) -> list[Table]:
+        return [
+            Table(
+                "FiveMin",
+                TableItem(
+                    functions.Average(1, self.variables["bp"], "IEEE4", False)
+                )
+            )
+        ]
+
+    @property 
+    def program(self) -> str:
+        "\n".join(
+        [
+            functions.PortSet(self.wires["Green"], "1"),
+            functions.VoltSE(self.variables["bp"], 1, "mV5000", self.wires["Blue"], True, 0, 60, 0.2, 600),
+            f"{self.variables["bp"]} = {self.variables["bp"]}*0.1"
+        ]
+    )
 test = RMYoung_05108_77()
 print(test.program)

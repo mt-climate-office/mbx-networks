@@ -1,16 +1,24 @@
-from pydantic import BaseModel
+from dataclasses import dataclass, field
 from datetime import date
 
-from instruments import Instrument
+from instruments import Instrument, Table
 from typing import Literal
 
 
-class Program(BaseModel):
+@dataclass
+class Program:
     name: str
     instruments: list[Instrument]
     mode: Literal["SequentialMode", "PipelineMode"] = "SequentialMode"
     preserve_variables: bool = True
+    tables: list[Table] = field(init=False)
 
+    def __post_init__(self):
+        self.__find_tables()
+
+    def __find_tables(self):
+        # TODO: Here look through instruments and find all shared tables.
+        ...
     def construct(self):
         s = f"'{self.name}\n'Program Created on: {date.today()}\n\n"
         s += "'SYSTEM CONFIGURATION\n"
