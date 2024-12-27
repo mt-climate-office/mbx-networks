@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 from datetime import date
 
-from instruments import Instrument, Table
+from instruments import Instrument, Table, Vaisala_HMP155, Acclima_TDR310N, RMYoung_05108_77
 from typing import Literal
 
 
@@ -28,8 +28,32 @@ class Program:
         s += "\n\nWiring Diagram\n"
         for i in self.instruments:
             s += f"####{i.model} Wiring####\n"
-            s += str(i.wiring)
+            s += str(i.wires) + "\n\n"
 
-        s += "\n".join()
+        for i in self.instruments:
+            print(i.variables)
+            for v in i.variables:
+                print(v)
+                s += v.declaration_str() + "\n"
+        # s += "\n".join()
 
-        ...
+        return s
+
+
+my_sensors = [
+    Vaisala_HMP155(200),
+    Acclima_TDR310N(5, "1"),
+    Acclima_TDR310N(5, 'a'),
+    Acclima_TDR310N(10, '2'),
+    Acclima_TDR310N(10, 'b'),
+    RMYoung_05108_77(1000)
+]
+
+program = Program(
+    "test program",
+    my_sensors, 
+    "SequentialMode",
+    True
+)
+
+print(program.construct())

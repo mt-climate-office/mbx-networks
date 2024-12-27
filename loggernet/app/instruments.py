@@ -3,12 +3,12 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 import functions
 from functions import Variable, VarType, DataType
-from typing import Literal
+from typing import Literal, Callable, Optional
 from abc import ABC
 from enum import Enum
-import operators as op
+from operators import If, For
+from textwrap import indent
 
-field()
 @dataclass
 class TableItem:
     func: str
@@ -57,6 +57,7 @@ class Table:
         self.data_interval = data_interval
         self.card_out = card_out
 
+
     def __str__(self):
         s = f"DataTable({self.name},self.trig_var)\n"
         s += f"    {str(self.data_interval)}\n"
@@ -79,15 +80,48 @@ class Table:
             and self.card_out == other.card_out
         )
 
+@dataclass
+class Scan:
+    ScanInterval: int
+    ScanUnit: Literal["uSec", "mSec", "Sec", "Min", "Hr", "Day"]
+    BufferOption: Literal[0, 1, 2, 3]
+    Count: int
+
+    def __str__(self):
+        return f"Scan({self.ScanInterval},{self.ScanUnit},{self.BufferOption},{self.Count})"
+
+@dataclass
+class SlowSequence:
+    id: int | str
+    scan: Scan
+    logic: str | list[str]
+
+    def __post_init__(self):
+        if isinstance(self.logic, list):
+            self.logic = "\n".join(self.logic)
+    
+
+    def __str__(self) -> str:
+        return "\n".join([
+            "SlowSequence",
+            str(self.scan),
+            indent(str(self.logic), "    "),
+            "NextScan"
+        ])
 
 class WireOptions(Enum):
+    COM1 = "ComC1"
     C1 = "C1"
     C2 = "C2"
+    COM3 = "ComC3"
     C3 = "C3"
     C4 = "C4"
+    COM5 = "ComC5"
     C5 = "C5"
     C6 = "C6"
+    COM7 = "ComC7"
     C7 = "C7"
+    C8 = "C8"
     P1 = "P1"
     P2 = "P2"
     P3 = "P3"
@@ -116,7 +150,7 @@ class WireOptions(Enum):
 class Wire:
     wire: str
     port: WireOptions
-    description: str | None
+    description: Optional[str] = ""
 
     def __str__(self):
         return f"{self.wire + ':':<8} {self.port.value:<8} {self.description:<10}"
@@ -153,8 +187,22 @@ class Instrument(ABC):
     sdi12_address: str | None = None
 
     def __post_init__(self):
+        self.check_unique_names()
         if isinstance(self.variables, list):
             self.variables = {x.name: x for x in self.variables}
+        
+
+    def check_unique_names(self):
+        exists = []
+        is_list = isinstance(self.variables, list)
+        iterator = self.variables if is_list else self.variables.keys()
+
+        for v in iterator:
+            v = v.name if is_list else v
+            if v in exists:
+                raise ValueError(f"Variable named {v} is duplicated... Please make all names unique.")
+            exists.append(v)
+        
 
     def update_var_names(self):
         raise NotImplementedError("Method not implemented...")
@@ -194,13 +242,11 @@ class RMYoung_05108_77(Instrument):
             description="* NOTE: Ground to EARTH in junction box directly to mast",
         )
         self.variables = [
-            Variable("WS_offset", VarType.CONST, 0),
-            Variable("WS_multiplier", VarType.CONST, 0.1666),
+            Variable("WS_offset", VarType.CONST, value=0),
+            Variable("WS_multiplier", VarType.CONST, value=0.1666),
             Variable("wind_spd", VarType.PUBLIC, units="m s-1"),
             Variable("wind_dir", VarType.PUBLIC, units="arcdeg"),
             Variable("wind_timer", VarType.PUBLIC, units="sec"),
-            Variable("wind_dir_sd", table_only=True),
-            Variable("windgust", table_only=True),
         ]
         return super().__post_init__()
 
@@ -223,7 +269,7 @@ class RMYoung_05108_77(Instrument):
                     field_names=[
                         self.variables["wind_spd"],
                         self.variables["wind_dir"],
-                        self.variables["wind_dir_sd"],
+                        f"{self.variables["wind_dir"]}_sd",
                     ],
                 ),
                 TableItem(
@@ -234,7 +280,7 @@ class RMYoung_05108_77(Instrument):
                         False,
                         False,
                     ),
-                    field_names=[self.variables["wind_timer"]],
+                    field_names=["windgust"],
                 ),
                 size=-1,
                 data_interval=DataInterval(),
@@ -280,7 +326,7 @@ class RMYoung_05108_77(Instrument):
                     self.variables["WS_multiplier"],
                     self.variables["WS_offset"],
                 ),
-                op.If(
+                If(
                     self.variables["wind_spd"],
                     "<=",
                     0,
@@ -339,7 +385,7 @@ class Vaisala_HMP155(Instrument):
         self.type = "RH/T"
 
         self.wires = WiringDiagram(
-            Wire("Brown", WireOptions.C7, "RS485 B"),
+            Wire("Brown", WireOptions.COM7, "RS485 B"),
             Wire("Pink", WireOptions.C8, "RS485 A"),
             Wire("Red", WireOptions.RG2),
             Wire("Blue", WireOptions._12V, "12V Power"),
@@ -347,6 +393,154 @@ class Vaisala_HMP155(Instrument):
         )
 
         self.variables = [
-            Variable("rhtemp(2)", VarType.PUBLIC, DataType.FLOAT)
+            Variable("rhtemp(2)", VarType.PUBLIC, DataType.FLOAT),
+            Variable("rhtemp(1)", VarType.ALIAS, value="rh", units="%"),
+            Variable("rhtemp(2)", VarType.ALIAS, value="air_temp", units="deg C"),
+            Variable("reset_hmp155", VarType.PUBLIC, DataType.BOOLEAN),
+            Variable("NBytesReturned", VarType.DIM, DataType.LONG),
+            Variable("SerialIngest", VarType.DIM, DataType("String26")),
+            Variable("String_1", VarType.DIM, DataType.STRING),
+            Variable("String_2", VarType.DIM, DataType.STRING),
+            Variable("CRLF", VarType.CONST, value="CHR(13)+CHR(10)")
         ]
         return super().__post_init__()
+    
+    @property
+    def tables(self) -> list[Table]:
+        return [
+            Table(
+                "FiveMin",
+                TableItem(
+                    functions.Average(1, self.variables["air_temp"], "FP2", False),
+                    [self.variables["air_temp"]]
+                ),
+                TableItem(
+                    functions.Maximum(1, self.variables["air_temp"], "FP2", 0, 1),
+                    [f"{self.variables['air_temp']}_max"]
+                ),
+                TableItem(
+                    functions.Minimum(1, self.variables["air_temp"], "FP2", 0, 1),
+                    [f"{self.variables['air_temp']}_min"]
+                ),
+                TableItem(
+                    functions.Average(1, self.variables["rh"], "FP2", False),
+                    [self.variables["rh"]]
+                )
+            )
+        ]
+
+    @property
+    def pre_scan(self) -> str:
+        return f"{self.variables["reset_hmp155"]} = True"
+
+    @property
+    def program(self) -> str:
+        "\n".join([
+            str(If(
+                self.variables["reset_hmp155"],
+                logic=[
+                    functions.SerialOpen(self.wires["Brown"], 4800, '10', 0, 53, "4"),
+                    f"{self.variables["String_1"]} =  \"SMODE RUN\"+{self.variables["CRLF"]}",
+                    f"{self.variables["String_2"]} = \"R\"+{self.variables["CRLF"]}",
+                    functions.SerialOut(self.wires["Brown"],self.variables["String_1"], "\"RUN\"", 3, 100),
+                    functions.Delay(0, 500, 1),
+                    functions.SerialOut(self.wires["Brown"],self.variables["String_2"], "\"RH\"", 3, 100),
+                    f"{self.variables["reset_hmp155"]} = False"
+                ]
+            )),
+            functions.SerialInRecord(
+                self.wires["Brown"], self.variables["SerialIngest"],"00",25,"&H0D0A", self.variables["NBytesReturned"],"01"
+            ),
+            # TODO: see if I can do this instead of rhtemp(1). Test on datalogger.
+            functions.SplitStr(self.variables["rh"], self.variables["SerialIngest"],"\"=\"",2,0),
+            functions.SerialFlush(self.wires["Brown"])
+        ])
+
+class Acclima_TDR310N(Instrument):
+    def __post_init__(self):
+        self.model = "TDR-310N"
+        self.manufacturer = "Acclima"
+        self.type = "Soil"
+
+        self.wires = WiringDiagram(
+            Wire("Blue", WireOptions.C3, "SDI-12 data  SDI_ADD: 1-5"),
+            Wire("Red", WireOptions._12V, "12v Power"),
+            Wire("White", WireOptions.G, "Ground")
+        )
+
+        self.variables = [
+            Variable("soil(5)", VarType.PUBLIC),
+            Variable("soil(1)", VarType.ALIAS, value="soil_vwc", units="m3 m-3"),
+            Variable("soil(2)", VarType.ALIAS, value="soil_temp", units="deg C"),
+            Variable("soil(3)", VarType.ALIAS, value="soil_perm"),
+            Variable("soil(4)", VarType.ALIAS, value="soil_ec_blk", units="uS cm-1"),
+            Variable("soil(5)", VarType.ALIAS, value="soil_ec_por", units="uS cm-1"),
+
+        ]
+        return super().__post_init__()
+    
+
+    @property
+    def tables(self) -> list[Table]:
+        return [
+            Table(
+                "FiveMin",
+                TableItem(
+                    functions.Sample(1, f'{self.variables["soil_vwc"]}*.01',"FP2"),
+                    [self.variables["soil_vwc"]]
+                ),
+                TableItem(
+                    functions.Sample(1, f'{self.variables["soil_temp"]}',"FP2"),
+                    [self.variables["soil_temp"]]
+                ),
+                TableItem(
+                    functions.Sample(1, f'{self.variables["soil_ec_blk"]}',"FP2"),
+                    [self.variables["soil_ec_blk"]]
+                ),
+                TableItem(
+                    functions.Sample(1, f'{self.variables["soil_ec_por"]}',"FP2"),
+                    [self.variables["soil_ec_por"]]
+                ),
+                TableItem(
+                    functions.Sample(1, f'{self.variables["soil_perm"]}',"FP2"),
+                    [self.variables["soil_perm"]]
+                ),
+            ),
+            Table(
+                "Soils",
+                TableItem(
+                    functions.Sample(1, f'{self.variables["soil_vwc"]}*.01',"FP2"),
+                    [self.variables["soil_vwc"]]
+                ),
+                TableItem(
+                    functions.Sample(1, f'{self.variables["soil_temp"]}',"FP2"),
+                    [self.variables["soil_temp"]]
+                ),
+                TableItem(
+                    functions.Sample(1, f'{self.variables["soil_ec_blk"]}',"FP2"),
+                    [self.variables["soil_ec_blk"]]
+                ),
+                TableItem(
+                    functions.Sample(1, f'{self.variables["soil_ec_por"]}',"FP2"),
+                    [self.variables["soil_ec_por"]]
+                ),
+                TableItem(
+                    functions.Sample(1, f'{self.variables["soil_perm"]}',"FP2"),
+                    [self.variables["soil_perm"]]
+                ),
+                card_out=None
+            )
+        ]
+    
+    @property
+    def slow_sequence(self):
+        return SlowSequence(
+            "soil",
+            Scan(1, "Min", 0, 0),
+            If(
+                functions.IfTime(4, 5, "min"), 
+                logic=functions.SDI12Recorder(self.variables["soil(5)"], self.wires["Blue"], self.sdi12_address, "M1!", 1, 0, -1)
+            )
+        )
+        
+

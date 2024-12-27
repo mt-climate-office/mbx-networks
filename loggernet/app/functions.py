@@ -1,5 +1,5 @@
-from typing import NewType, Literal
-from dataclasses import dataclass
+from typing import Any, NewType, Literal
+from dataclasses import dataclass, field
 from enum import Enum
 import re
 
@@ -10,6 +10,9 @@ class VarType(Enum):
     DIM = "Dim"
     ALIAS = "Alias"
 
+import re
+from enum import Enum
+
 class DataType(Enum):
     FLOAT = "Float"
     BOOLEAN = "Boolean"
@@ -18,54 +21,63 @@ class DataType(Enum):
 
     @classmethod
     def _missing_(cls, value):
-
+        # Handle custom string types like "String20"
         if isinstance(value, str) and re.match(r"^String\d+$", value):
-            length = int(value[6:]) 
+            length = int(value[6:])  # Extract the length from the value (e.g., 20 from "String20")
+            
+            # Dynamically create a new Enum member
             member = object.__new__(cls)
             member._value_ = value
+            member._name_ = cls.STRING  # Optional: Set to None because it doesn't correspond to a predefined member
             member.length = length
             return member
-        
+
         return None
     
     def __str__(self):
-        return self.value
-
+        try:
+            return f"{self.value} * {self.length}"
+        except AttributeError:
+            return self.value
 
 @dataclass
 class Variable:
     name: str
-    var_type: VarType | None = None
+    var_type: VarType
     data_type: DataType | None = None
     value: str | int | float | None = None
     units: str | None = None
-    table_only: bool = False
+    rename_to: str | None = None
+    meta: dict[str, Any] = field(init=False)
 
     def __post_init__(self):
-        if self.var_type == "Const" and self.value is None:
+        self.meta = {}
+        if self.var_type == VarType.CONST and self.value is None:
             raise ValueError("When defining a Const type, value must not be none.")
-
-    def __str__(self):
-        return self.name
-
-    def declaration_str(self):
-        if self.var_type is not None:
-            out = f"{self.var_type} {self.name}"
-            if self.var_type == "Const":
-                out = f"{out} = {self.value}"
+        if self.var_type == VarType.ALIAS:
+            assert self.value is not None, "When defining an Alias, a value must be defined."
+            self.meta["orig_name"] = self.name
+            self.name = self.value
         
-            if self.data_type is not None:
-                try: 
-                    length = self.data_type.length
-                    out = f"{out} as {self.data_type.value} * {length}"
-                except AttributeError:
-                    out = f"{out} as {self.data_type.value}"
+    def __str__(self):
+        return self.rename_to or self.name
 
-            if self.units is not None:
-                out = f"{out} : Units {self.name} = {self.units}"
+    def declaration_str(self) -> str:
 
-            return out
-        return self.name
+        v_name = self.name if self.var_type != VarType.ALIAS else self.meta["orig_name"]
+        out = f"{self.var_type} {v_name}"
+
+        if self.var_type in [VarType.CONST, VarType.ALIAS]:
+            out = f"{out} = {self.value}"
+    
+        if self.data_type is not None:
+            out = f"{out} as {str(self.data_type)}"
+
+        if self.units is not None:
+            out = f"{out} : Units {self.name} = {self.units}"
+        
+
+        return out
 
 
 Constant = NewType("Constant", int)
@@ -219,7 +231,7 @@ def Average(
     Reps: Constant,
     Source: Variable,
     DataType: Literal[
-    "IEEE4", "String", "Boolean", "BOOL8", "Long", "NSEC", "UINT1", "UINT2", "UINT4"
+    "IEEE4", "String", "Boolean", "BOOL8", "Long", "NSEC", "UINT1", "UINT2", "UINT4", "FP2"
     ],
     DisableVar: Variable | Constant | Expression,
 ) -> str:
@@ -6877,7 +6889,7 @@ def Maximum(
     Reps: Constant,
     Source: Variable,
     DataType: Literal[
-        "String", "Boolean", "BOOL8", "Long", "NSEC", "UINT1", "UINT2", "UINT4"
+        "String", "Boolean", "BOOL8", "Long", "NSEC", "UINT1", "UINT2", "UINT4", "FP2",
     ],
     DisableVar: Variable | Constant | Expression,
     Time: Literal["0", "1"],
@@ -7043,7 +7055,7 @@ def Minimum(
     Reps: Constant,
     Source: Variable,
     DataType: Literal[
-        "String", "Boolean", "BOOL8", "Long", "NSEC", "UINT1", "UINT2", "UINT4"
+        "String", "Boolean", "BOOL8", "Long", "NSEC", "UINT1", "UINT2", "UINT4", "FP2",
     ],
     DisableVar: Variable | Constant | Expression,
     Time: Literal["0", "1"],
@@ -8372,7 +8384,7 @@ def Sample(
     Reps: Constant,
     Source: Variable,
     DataType: Literal[
-        "String", "Boolean", "BOOL8", "Long", "NSEC", "UINT1", "UINT2", "UINT4"
+        "String", "Boolean", "BOOL8", "Long", "NSEC", "UINT1", "UINT2", "UINT4", "FP2",
     ],
 ) -> str:
     """For a full description of this function, visit [https://help.campbellsci.com/crbasic/cr1000x/Content/Instructions/sample.htm](https://help.campbellsci.com/crbasic/cr1000x/Content/Instructions/sample.htm).
@@ -8462,8 +8474,8 @@ def SDI12Recorder(
     ],
     Mult: Variable | Constant | Expression | Array,
     Offset: Variable | Constant | Expression | Array,
-    FillNAN: Constant,
-    WaitonTimeout: Constant,
+    FillNAN: Constant = 0,
+    WaitonTimeout: Constant = 0,
 ) -> str:
     """For a full description of this function, visit [https://help.campbellsci.com/crbasic/cr1000x/Content/Instructions/sdi12recorder.htm](https://help.campbellsci.com/crbasic/cr1000x/Content/Instructions/sdi12recorder.htm).
 
@@ -9206,6 +9218,7 @@ def SerialOpen(
     ],
     BaudRate: Constant,
     SerialOpenFormat: Literal[
+        "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15",
         "16",
         "17",
         "18",
