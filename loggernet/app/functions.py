@@ -10,8 +10,9 @@ class VarType(Enum):
     DIM = "Dim"
     ALIAS = "Alias"
 
-import re
-from enum import Enum
+    def __str__(self):
+        return self.value
+
 
 class DataType(Enum):
     FLOAT = "Float"
@@ -23,8 +24,10 @@ class DataType(Enum):
     def _missing_(cls, value):
         # Handle custom string types like "String20"
         if isinstance(value, str) and re.match(r"^String\d+$", value):
-            length = int(value[6:])  # Extract the length from the value (e.g., 20 from "String20")
-            
+            length = int(
+                value[6:]
+            )  # Extract the length from the value (e.g., 20 from "String20")
+
             # Dynamically create a new Enum member
             member = object.__new__(cls)
             member._value_ = value
@@ -33,12 +36,13 @@ class DataType(Enum):
             return member
 
         return None
-    
+
     def __str__(self):
         try:
             return f"{self.value} * {self.length}"
         except AttributeError:
             return self.value
+
 
 @dataclass
 class Variable:
@@ -55,27 +59,27 @@ class Variable:
         if self.var_type == VarType.CONST and self.value is None:
             raise ValueError("When defining a Const type, value must not be none.")
         if self.var_type == VarType.ALIAS:
-            assert self.value is not None, "When defining an Alias, a value must be defined."
+            assert (
+                self.value is not None
+            ), "When defining an Alias, a value must be defined."
             self.meta["orig_name"] = self.name
             self.name = self.value
-        
+
     def __str__(self):
         return self.rename_to or self.name
 
     def declaration_str(self) -> str:
-
         v_name = self.name if self.var_type != VarType.ALIAS else self.meta["orig_name"]
         out = f"{self.var_type} {v_name}"
 
         if self.var_type in [VarType.CONST, VarType.ALIAS]:
             out = f"{out} = {self.value}"
-    
+
         if self.data_type is not None:
             out = f"{out} as {str(self.data_type)}"
 
         if self.units is not None:
             out = f"{out} : Units {self.name} = {self.units}"
-        
 
         return out
 
@@ -231,7 +235,16 @@ def Average(
     Reps: Constant,
     Source: Variable,
     DataType: Literal[
-    "IEEE4", "String", "Boolean", "BOOL8", "Long", "NSEC", "UINT1", "UINT2", "UINT4", "FP2"
+        "IEEE4",
+        "String",
+        "Boolean",
+        "BOOL8",
+        "Long",
+        "NSEC",
+        "UINT1",
+        "UINT2",
+        "UINT4",
+        "FP2",
     ],
     DisableVar: Variable | Constant | Expression,
 ) -> str:
@@ -6889,7 +6902,15 @@ def Maximum(
     Reps: Constant,
     Source: Variable,
     DataType: Literal[
-        "String", "Boolean", "BOOL8", "Long", "NSEC", "UINT1", "UINT2", "UINT4", "FP2",
+        "String",
+        "Boolean",
+        "BOOL8",
+        "Long",
+        "NSEC",
+        "UINT1",
+        "UINT2",
+        "UINT4",
+        "FP2",
     ],
     DisableVar: Variable | Constant | Expression,
     Time: Literal["0", "1"],
@@ -7055,7 +7076,15 @@ def Minimum(
     Reps: Constant,
     Source: Variable,
     DataType: Literal[
-        "String", "Boolean", "BOOL8", "Long", "NSEC", "UINT1", "UINT2", "UINT4", "FP2",
+        "String",
+        "Boolean",
+        "BOOL8",
+        "Long",
+        "NSEC",
+        "UINT1",
+        "UINT2",
+        "UINT4",
+        "FP2",
     ],
     DisableVar: Variable | Constant | Expression,
     Time: Literal["0", "1"],
@@ -8384,7 +8413,15 @@ def Sample(
     Reps: Constant,
     Source: Variable,
     DataType: Literal[
-        "String", "Boolean", "BOOL8", "Long", "NSEC", "UINT1", "UINT2", "UINT4", "FP2",
+        "String",
+        "Boolean",
+        "BOOL8",
+        "Long",
+        "NSEC",
+        "UINT1",
+        "UINT2",
+        "UINT4",
+        "FP2",
     ],
 ) -> str:
     """For a full description of this function, visit [https://help.campbellsci.com/crbasic/cr1000x/Content/Instructions/sample.htm](https://help.campbellsci.com/crbasic/cr1000x/Content/Instructions/sample.htm).
@@ -9218,7 +9255,21 @@ def SerialOpen(
     ],
     BaudRate: Constant,
     SerialOpenFormat: Literal[
-        "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15",
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+        "7",
+        "8",
+        "9",
+        "10",
+        "11",
+        "12",
+        "13",
+        "14",
+        "15",
         "16",
         "17",
         "18",
