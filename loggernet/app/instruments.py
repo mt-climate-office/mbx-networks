@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 import functions
 from functions import Variable, VarType, DataType
-from typing import Literal, Optional
+from typing import Literal, Optional, Callable
 from abc import ABC
 from enum import Enum
 from operators import If
@@ -122,7 +122,7 @@ class SlowSequence:
     def __str__(self) -> str:
         return "\n".join(
             [
-                "SlowSequence",
+                f"SlowSequence '{self.id}",
                 str(self.scan),
                 indent(str(self.logic), "    "),
                 "NextScan",
@@ -166,6 +166,9 @@ class WireOptions(Enum):
     G = "G"
     _12V = "12V"
 
+    def __str__(self):
+        return self.value
+
 
 @dataclass
 class Wire:
@@ -191,7 +194,7 @@ class WiringDiagram:
     def __getitem__(self, item: str) -> str:
         for wire in self.args:
             if wire.wire.lower() == item.lower():
-                return item
+                return str(wire.port)
 
         raise KeyError(f"No wire with color {item} found.")
 
@@ -206,12 +209,17 @@ class Instrument(ABC):
 
     elevation: int | None = None
     sdi12_address: str | None = None
+    transform: Callable[["Instrument"], "Instrument"] | None = None
 
     def __post_init__(self):
         if isinstance(self.variables, list):
             self.variables = {x.name: x for x in self.variables}
-
+        if self.transform is not None:
+            self._transform()
         self.check_unique_names()
+
+    def _transform(self):
+        self.transform(self)
 
     def check_unique_names(self):
         exists = []
@@ -227,24 +235,24 @@ class Instrument(ABC):
             exists.append(v)
 
     @property
-    def tables(self):
-        raise NotImplementedError("Method not implemented...")
+    def tables(self) -> list[Table]:
+        ...
 
     @property
-    def pre_scan(self):
-        raise NotImplementedError("Method not implemented...")
+    def pre_scan(self) -> str:
+        ...
 
     @property
-    def funcs(self):
-        raise NotImplementedError("Method not implemented...")
+    def funcs(self) -> list[str]:
+        ...
 
     @property
-    def program(self):
-        raise NotImplementedError("Method not implemented...")
+    def program(self) -> str:
+        ...
 
     @property
-    def slow_sequence(self):
-        raise NotImplementedError("Method not implemented...")
+    def slow_sequence(self) -> SlowSequence:
+        ...
 
 
 class RMYoung_05108_77(Instrument):
@@ -533,15 +541,32 @@ class Acclima_TDR310N(Instrument):
         )
 
         self.variables = [
-            # TODO: Finish implementing name transform here such that I can still access
-            # variables using these short names, but I can include the sdi12 address and elevation
-            # in the program logic.
-            Variable("soil(5)", VarType.PUBLIC),
-            Variable("soil(1)", VarType.ALIAS, value="soil_vwc", units="m3 m-3"),
-            Variable("soil(2)", VarType.ALIAS, value="soil_temp", units="deg C"),
-            Variable("soil(3)", VarType.ALIAS, value="soil_perm"),
-            Variable("soil(4)", VarType.ALIAS, value="soil_ec_blk", units="uS cm-1"),
-            Variable("soil(5)", VarType.ALIAS, value="soil_ec_por", units="uS cm-1"),
+            Variable(f"soil_{self.sdi12_address}(5)", VarType.PUBLIC),
+            Variable(
+                f"soil_{self.sdi12_address}(1)",
+                VarType.ALIAS,
+                value="soil_vwc",
+                units="m3 m-3",
+            ),
+            Variable(
+                f"soil_{self.sdi12_address}(2)",
+                VarType.ALIAS,
+                value="soil_temp",
+                units="deg C",
+            ),
+            Variable(f"soil_{self.sdi12_address}(3)", VarType.ALIAS, value="soil_perm"),
+            Variable(
+                f"soil_{self.sdi12_address}(4)",
+                VarType.ALIAS,
+                value="soil_ec_blk",
+                units="uS cm-1",
+            ),
+            Variable(
+                f"soil_{self.sdi12_address}(5)",
+                VarType.ALIAS,
+                value="soil_ec_por",
+                units="uS cm-1",
+            ),
         ]
         return super().__post_init__()
 
@@ -598,14 +623,14 @@ class Acclima_TDR310N(Instrument):
         ]
 
     @property
-    def slow_sequence(self):
+    def slow_sequence(self) -> SlowSequence:
         return SlowSequence(
             "soil",
             Scan(1, "Min", 0, 0),
             If(
                 functions.IfTime(4, 5, "min"),
                 logic=functions.SDI12Recorder(
-                    self.variables["soil(5)"],
+                    self.variables[f"soil_{self.sdi12_address}(5)"],
                     self.wires["Blue"],
                     self.sdi12_address,
                     "M1!",
@@ -615,3 +640,15 @@ class Acclima_TDR310N(Instrument):
                 ),
             ),
         )
+
+
+class ProStar_EMC1(Instrument):
+    def __post_init__(self):
+        self.model = "ProStar"
+        self.manufacturer = "EMC-1"
+        self.type = "Charge Data"
+        
+        self.variables = [
+
+        ]
+        return super().__post_init__()

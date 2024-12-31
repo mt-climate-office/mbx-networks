@@ -2,6 +2,7 @@ from typing import Any, NewType, Literal
 from dataclasses import dataclass, field
 from enum import Enum
 import re
+from textwrap import indent
 
 
 class VarType(Enum):
@@ -73,13 +74,14 @@ class Variable:
         out = f"{self.var_type} {v_name}"
 
         if self.var_type in [VarType.CONST, VarType.ALIAS]:
-            out = f"{out} = {self.value}"
+            val = self.rename_to or self.value
+            out = f"{out} = {val}"
 
         if self.data_type is not None:
             out = f"{out} as {str(self.data_type)}"
 
         if self.units is not None:
-            out = f"{out} : Units {self.name} = {self.units}"
+            out = f"{out} : Units {self.rename_to or self.name} = {self.units}"
 
         return out
 
@@ -153,6 +155,28 @@ def AddPrecise(PrecisionVariable: Variable, X: Variable) -> str:
     """
     return f"AddPrecise({PrecisionVariable},{X})"
 
+
+def custom(
+    name: str,
+    *args: str,
+    logic: str | list[str]
+) -> str:
+    """Create user-defined function
+
+    Args:
+        name (str): Name of the function
+        logic (str | list[str]): The LoggerNet code logic body of the function.
+
+    Returns:
+        str: A string that can be inserted into a CR1X loggernet program to create the function. 
+    """
+    s = f"Function {name}({','.join(args)})\n"
+    if isinstance(logic, list):
+        logic = '\n'.join(logic)
+    
+    s += indent(logic, "    ")
+    s += "\nEndFuncion"
+    
 
 def AM25T(
     Dest: Variable | Array,
