@@ -6,6 +6,8 @@ import uuid
 import os
 
 from app.db import get_db, init_db, Instruments
+from app.schemas import valid_instruments
+
 
 app = FastAPI()
 
@@ -32,6 +34,7 @@ def create_record(
 
 
 # GET endpoint to fetch a record by short_name
+# TODO: Swap this to use instruments.py rather than db.
 @app.get("/instrument/{short_name}")
 def get_record(short_name: str, db: Session = Depends(get_db)):
     record = db.query(Instruments).filter(Instruments.short_name == short_name).first()

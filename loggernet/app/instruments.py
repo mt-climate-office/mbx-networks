@@ -254,6 +254,27 @@ class Instrument(ABC):
     def slow_sequence(self) -> SlowSequence:
         ...
 
+    def __str__(self) -> str:
+        table_str = "Defined Tables:\n"+"\n".join(str(x) for x in self.tables) if self.tables else ""
+        pre_scan = f"Pre-Scan Logic:\n{self.pre_scan}\n" if self.pre_scan else ""
+        function_str = "User-Defined Functions:\n"+"\n".join(str(x) for x in self.funcs) if self.funcs else ""
+        program = f"Program Logic:\n\n{self.program}\n" if self.program else ""
+        slow_seq = f"Slow Sequence:\n\n{self.slow_sequence}\n" if self.slow_sequence else ""
+
+        return "\n".join([
+            f"{self.manufacturer} {self.model} ({self.type})",
+            "\nWiring Defaults:",
+            str(self.wires) or "",
+            "\nLoggerNet Variables:",
+            "\n".join(x.declaration_str() for x in self.variables.values()),
+            "\n",
+            table_str,
+            function_str,
+            pre_scan,
+            program,
+            slow_seq,
+        ])
+
 
 class RMYoung_05108_77(Instrument):
     def __post_init__(self):
@@ -652,3 +673,13 @@ class ProStar_EMC1(Instrument):
 
         ]
         return super().__post_init__()
+    
+
+INSTRUMENTS = {
+    "RMYoung_05108_77": RMYoung_05108_77,
+    "Setra_CS100": Setra_CS100,
+    "Vaisala_HMP155": Vaisala_HMP155,
+    "Acclima_TDR310N": Acclima_TDR310N,
+}
+
+print(str(RMYoung_05108_77()))
