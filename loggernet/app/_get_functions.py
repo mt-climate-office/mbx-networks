@@ -515,12 +515,12 @@ class CSIFunction:
 
     def __str__(self):
         args = ", ".join(
-            f"{obj.short_name.replace(" ", "").replace("\"", "").replace("/", "").replace(":", "").replace("Argument1..Argument10", "*args")}: {'Literal[' + ', '.join(f'"{x.choices.replace('"', '\"')}"' for x in obj.options) + ']' if obj.options is not None else ' | '.join(obj.type)}"
+            f"{obj.short_name.replace(' ', '').replace('"', '').replace('/', '').replace(':', '').replace('Argument1..Argument10', '*args')}: {'Literal[' + ', '.join(f'"{x.choices.replace('"', '"')}"' for x in obj.options) + ']' if obj.options is not None else ' | '.join(obj.type)}"
             if hasattr(obj, "type")
             else obj.short_name
             for obj in self.args
         )
-        return_args = f"{','.join([f'{{{x.short_name.replace(" ", "").replace("\"", "").replace("/", "").replace(":", "")}}}' for x in self.args])}"
+        return_args = f"{','.join([f'{{{x.short_name.replace(" ", "").replace('"', "").replace("/", "").replace(":", "")}}}' for x in self.args])}"
         arg_descriptions = "\n        ".join(
             f"{obj.short_name} ({' | '.join(obj.type)}): {obj.description}"
             + (
@@ -608,13 +608,13 @@ def get_function_def(function):
         url_str = "setstatussetsetting"
 
     url_str = NAME_REMAPPER.get(url_str.lower(), url_str)
-    url = f"{URL}/Content/Instructions/{url_str.lower().replace("_", "")}.htm"
+    url = f"{URL}/Content/Instructions/{url_str.lower().replace('_', '')}.htm"
 
     retries = 0
     request = httpx.get(url, follow_redirects=True)
     while request.status_code == 404 and retries < 10:
-        new_url = f"{url_str}{retries+1}"
-        url = f"{URL}/Content/Instructions/{new_url.lower().replace("_", "")}.htm"
+        new_url = f"{url_str}{retries + 1}"
+        url = f"{URL}/Content/Instructions/{new_url.lower().replace('_', '')}.htm"
         request = httpx.get(url, follow_redirects=True)
         retries += 1
 

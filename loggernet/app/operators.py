@@ -18,7 +18,7 @@ class If:
         if isinstance(logic, str):
             logic = [logic]
         self.else_ifs.append(
-            f"{self._join_if_logic(*args, is_initial=False)}\n{"\n    ".join(x for x in logic)}"
+            f"{self._join_if_logic(*args, is_initial=False)}\n{'\n    '.join(x for x in logic)}"
         )
         return self
 

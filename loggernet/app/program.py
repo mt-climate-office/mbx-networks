@@ -21,9 +21,8 @@ class Program:
     instruments: list[Instrument]
     mode: Literal["SequentialMode", "PipelineMode"] = "SequentialMode"
     preserve_variables: bool = True
-    scan: Scan = field(
-        default_factory=lambda: Scan(3, "Sec", 1, 0)
-    )
+    include_batt: bool = False
+    scan: Scan = field(default_factory=lambda: Scan(3, "Sec", 1, 0))
     tables: list[Table] = field(init=False)
     functions: list[str] = field(init=False)
     slow_sequence: list[SlowSequence] = field(init=False)
@@ -33,6 +32,7 @@ class Program:
         self.__find_functions()
         self.__group_slow_sequence()
         self.__check_unique_names()
+        self.__validate_dependencies()
 
     def __find_functions(self):
         functions = set()
@@ -42,8 +42,12 @@ class Program:
                     functions.add(f)
             except NotImplementedError:
                 continue
-        
+
         self.functions = list(functions)
+
+    # TODO: Implement logic to make sure if an instruemnt has a dependency,
+    # that the dependency indeed exists.
+    def __validate_dependencies(self): ...
 
     def __find_tables(self):
         tables = {}
@@ -59,7 +63,7 @@ class Program:
                     tables[table.name] = table
 
         self.tables = list(tables.values())
-    
+
     def __group_slow_sequence(self):
         ss: dict[str, SlowSequence] = {}
 
@@ -70,8 +74,8 @@ class Program:
                     target.logic = f"{target.logic}\n{i.logic}"
                 else:
                     ss[i.id] = i
-        
-        self.slow_sequence = '\n\n'.join(str(x) for x in ss.values())
+
+        self.slow_sequence = "\n\n".join(str(x) for x in ss.values())
 
     def __check_unique_names(self):
         keys = []
@@ -106,19 +110,20 @@ class Program:
 
         for table in self.tables:
             s += str(table) + "\n\n"
-        
+
         if self.functions:
             s += "\n".join(self.functions)
             s += "\n"
-        
+
         s += "BeginProg\n"
 
         for i in self.instruments:
             if ps := i.pre_scan:
                 s += indent(ps, "    ")
                 s += "\n\n"
-        
+
         s += f"    {str(self.scan)}\n\n"
+
         for i in self.instruments:
             if pr := i.program:
                 s += indent(pr, "    ")
@@ -127,11 +132,19 @@ class Program:
         s += "\n    NextScan\n\n"
 
         calltable = "\n".join([f"CallTable {x.name}" for x in self.tables])
+
         s += indent(calltable, "    ")
-        s += '\n\n'
+        s += "\n\n"
+
+        for i in self.instruments:
+            if ps := i.post_scan:
+                s += indent(ps, "    ")
+                s += "\n\n"
+
+        s += "NextScan\n\n"
 
         s += indent(self.slow_sequence, "    ")
-        
+
         s += "\n\nEndProg"
 
         return s

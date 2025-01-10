@@ -6,7 +6,6 @@ import uuid
 import os
 
 from app.db import get_db, init_db, Instruments
-from app.schemas import valid_instruments
 
 
 app = FastAPI()

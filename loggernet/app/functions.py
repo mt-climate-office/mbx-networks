@@ -60,9 +60,9 @@ class Variable:
         if self.var_type == VarType.CONST and self.value is None:
             raise ValueError("When defining a Const type, value must not be none.")
         if self.var_type == VarType.ALIAS:
-            assert (
-                self.value is not None
-            ), "When defining an Alias, a value must be defined."
+            assert self.value is not None, (
+                "When defining an Alias, a value must be defined."
+            )
             self.meta["orig_name"] = self.name
             self.name = self.value
 
@@ -156,11 +156,7 @@ def AddPrecise(PrecisionVariable: Variable, X: Variable) -> str:
     return f"AddPrecise({PrecisionVariable},{X})"
 
 
-def custom(
-    name: str,
-    *args: str,
-    logic: str | list[str]
-) -> str:
+def custom(name: str, *args: str, logic: str | list[str]) -> str:
     """Create user-defined function
 
     Args:
@@ -168,15 +164,15 @@ def custom(
         logic (str | list[str]): The LoggerNet code logic body of the function.
 
     Returns:
-        str: A string that can be inserted into a CR1X loggernet program to create the function. 
+        str: A string that can be inserted into a CR1X loggernet program to create the function.
     """
     s = f"Function {name}({','.join(args)})\n"
     if isinstance(logic, list):
-        logic = '\n'.join(logic)
-    
+        logic = "\n".join(logic)
+
     s += indent(logic, "    ")
     s += "\nEndFuncion"
-    
+
 
 def AM25T(
     Dest: Variable | Array,
@@ -7416,20 +7412,7 @@ def ModbusServer(
 
 
 def ModbusClient(
-    ResultCode: Literal[
-        "-01",
-        "-02",
-        "-03",
-        "-04",
-        "-05",
-        "-06",
-        "-08",
-        "-09",
-        "-10",
-        "-11",
-        "-16",
-        "-20",
-    ],
+    ResultCode: Variable,
     ComPort: Literal[
         "ComRS232",
         "ComME",
@@ -7443,7 +7426,8 @@ def ModbusClient(
         "ComC3",
         "ComC5",
         "ComC7",
-    ],
+    ]
+    | Variable,
     BaudRate: Constant,
     ModbusAddr: Variable | Integer,
     Function: Literal["01", "02", "03", "04", "05", "06", "15", "16"],
@@ -10569,9 +10553,9 @@ def TCPOpen(
     IPAddr: Variable,
     TCPPort: Variable | Constant,
     IPBuffer: Constant,
-    IPTimeOut: Constant | Integer,
-    ConnectHandle: Variable,
-    MaxConnect: Constant | Integer,
+    IPTimeOut: Constant | Integer | None = None,
+    ConnectHandle: Variable | None = None,
+    MaxConnect: Constant | Integer | None = None,
 ) -> str:
     """For a full description of this function, visit [https://help.campbellsci.com/crbasic/cr1000x/Content/Instructions/tcpopen.htm](https://help.campbellsci.com/crbasic/cr1000x/Content/Instructions/tcpopen.htm).
 
