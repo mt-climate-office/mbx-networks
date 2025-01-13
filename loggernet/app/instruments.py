@@ -209,6 +209,7 @@ class Instrument(ABC):
     wires: WiringDiagram = field(init=False, default=None)
     variables: list[Variable] | dict[str, Variable] = field(init=False, default=None)
     dependencies: dict[str, Instrument] | None = field(init=False, default=None)
+    _slow_sequence: SlowSequence | str| None = field(init=False, default='initial')
 
     elevation: int | None = None
     sdi12_address: str | None = None
@@ -408,6 +409,7 @@ class RMYoung_05108_77(Instrument):
                 ).Else(f"{self.variables['wind_timer']} = 0"),
             ]
         )
+        
 
 
 class Setra_CS100(Instrument):
@@ -564,6 +566,11 @@ class Vaisala_HMP155(Instrument):
 
 class Acclima_TDR310N(Instrument):
     def __post_init__(self):
+
+        self.model = "Acclima"
+        self.manufacturer = "TDR-310N"
+        self.type = "Soil"
+
         if self.sdi12_address is None:
             raise AttributeError(
                 "This is an SDI12 device and an SDI12 address must be assigned."
@@ -663,23 +670,30 @@ class Acclima_TDR310N(Instrument):
         ]
 
     @property
-    def slow_sequence(self) -> SlowSequence:
-        return SlowSequence(
-            "soil",
-            Scan(1, "Min", 0, 0),
-            If(
-                functions.IfTime(4, 5, "min"),
-                logic=functions.SDI12Recorder(
-                    self.variables[f"soil_{self.sdi12_address}(5)"],
-                    self.wires["Blue"],
-                    self.sdi12_address,
-                    "M1!",
-                    1,
-                    0,
-                    -1,
+    def slow_sequence(self) -> SlowSequence | None | str:
+        if self._slow_sequence == 'initial':
+            self._slow_sequence = SlowSequence(
+                "soil",
+                Scan(1, "Min", 0, 0),
+                If(
+                    functions.IfTime(4, 5, "min"),
+                    logic=functions.SDI12Recorder(
+                        self.variables[f"soil_{self.sdi12_address}(5)"],
+                        self.wires["Blue"],
+                        self.sdi12_address,
+                        "M1!",
+                        1,
+                        0,
+                        -1,
+                    ),
                 ),
-            ),
-        )
+            )
+    
+        return self._slow_sequence
+    
+    @slow_sequence.setter
+    def slow_sequence(self, value: SlowSequence | None):
+        self._slow_sequence = value
 
 
 class ProStar_EMC1(Instrument):

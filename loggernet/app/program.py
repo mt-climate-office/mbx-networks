@@ -11,7 +11,7 @@ from instruments import (
     Scan,
     SlowSequence,
 )
-from typing import Literal
+from typing import Callable, Literal
 from textwrap import indent
 
 
@@ -27,12 +27,22 @@ class Program:
     functions: list[str] = field(init=False)
     slow_sequence: list[SlowSequence] = field(init=False)
 
+    transform: Callable[["Program"], "Program"] | None = None
+
+
     def __post_init__(self):
+
+        if self.transform is not None:
+            self._transform()
+
         self.__find_tables()
         self.__find_functions()
         self.__group_slow_sequence()
         self.__check_unique_names()
         self.__validate_dependencies()
+    
+    def _transform(self):
+        self.transform(self)
 
     def __find_functions(self):
         functions = set()
@@ -68,12 +78,15 @@ class Program:
         ss: dict[str, SlowSequence] = {}
 
         for instrument in self.instruments:
-            if i := instrument.slow_sequence:
-                if i.id in ss:
-                    target = ss[i.id]
-                    target.logic = f"{target.logic}\n{i.logic}"
-                else:
-                    ss[i.id] = i
+            try:
+                if i := instrument.slow_sequence:
+                    if i.id in ss:
+                        target = ss[i.id]
+                        target.logic = f"{target.logic}\n{i.logic}"
+                    else:
+                        ss[i.id] = i
+            except NotImplementedError:
+                continue
 
         self.slow_sequence = "\n\n".join(str(x) for x in ss.values())
 
@@ -118,16 +131,22 @@ class Program:
         s += "BeginProg\n"
 
         for i in self.instruments:
-            if ps := i.pre_scan:
-                s += indent(ps, "    ")
-                s += "\n\n"
+            try:
+                if ps := i.pre_scan:
+                    s += indent(ps, "    ")
+                    s += "\n\n"
+            except NotImplementedError:
+                continue
 
         s += f"    {str(self.scan)}\n\n"
 
         for i in self.instruments:
-            if pr := i.program:
-                s += indent(pr, "    ")
-                s += "\n\n"
+            try:
+                if pr := i.program:
+                    s += indent(pr, "    ")
+                    s += "\n\n"
+            except NotImplementedError:
+                continue
 
         s += "\n    NextScan\n\n"
 
@@ -137,9 +156,12 @@ class Program:
         s += "\n\n"
 
         for i in self.instruments:
-            if ps := i.post_scan:
-                s += indent(ps, "    ")
-                s += "\n\n"
+            try:
+                if ps := i.post_scan:
+                    s += indent(ps, "    ")
+                    s += "\n\n"
+            except NotImplementedError:
+                continue
 
         s += "NextScan\n\n"
 
@@ -157,6 +179,21 @@ def rename_soil(i: Instrument) -> None:
         if not re.search(pattern, v.name):
             v.rename_to = f"{v.name}_{i.elevation:04}_id{i.sdi12_address}"
 
+def soil_slow_seq_match(p: Program) -> None:
+    probes = []
+    
+    for i in p.instruments:
+        if i.type == "Soil":
+            probes.append(i)
+    
+    first: Acclima_TDR310N = probes.pop(0)
+    ss_logic = first.slow_sequence.logic
+    for probe in probes:
+        if ss_logic == (new_logic := probe.slow_sequence.logic):
+            ss_logic += new_logic
+        probe.slow_sequence = None
+    
+        ...
 
 my_sensors = [
     Vaisala_HMP155(200),
@@ -167,6 +204,6 @@ my_sensors = [
     RMYoung_05108_77(1000),
 ]
 
-program = Program("test program", my_sensors, "SequentialMode", True)
+program = Program("test program", my_sensors, "SequentialMode", True, transform=soil_slow_seq_match)
 
 print(program.construct())
