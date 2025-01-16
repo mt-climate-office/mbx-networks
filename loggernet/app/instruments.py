@@ -1142,6 +1142,7 @@ class OTT_PLS500(Instrument):
             ),
         )
 
+
 class OTT_Pluvio(Instrument):
     def __post_init__(self):
         self.manufacturer = "OTT"
@@ -1154,34 +1155,27 @@ class OTT_Pluvio(Instrument):
             Wire("White", WireOptions.G, "Data Ground"),
             Wire("Red", None, "24V DC Converter Out (Yellow)"),
             Wire("Yellow", WireOptions._12V, "12v Power"),
-            Wire("Brown", WireOptions.G, "Power Ground")
+            Wire("Brown", WireOptions.G, "Power Ground"),
         )
 
         self.variables = [
             Variable("Pluvio(9)", VarType.PUBLIC),
-            Variable("Pluvio(1)", VarType.ALIAS, value = "ppt_max_rate", units = "mm hr-1"),
-            Variable("Pluvio(2)", VarType.ALIAS, value = "ppt", units="mm"),
-            Variable("Pluvio(3)", VarType.ALIAS, value = "pluv_accuNRT", units="mm"),
-            Variable("Pluvio(4)", VarType.ALIAS, value = "pluv_accuTtlNRT", units="mm"),
-            Variable("Pluvio(5)", VarType.ALIAS, value = "pluv_fill", units="mm"),
-            Variable("Pluvio(6)", VarType.ALIAS, value = "pluv_bucketNRT", units="mm"),
-            Variable("Pluvio(7)", VarType.ALIAS, value = "pluv_temp", units="deg C"),
-            Variable("Pluvio(8)", VarType.ALIAS, value = "pluv_heater", units="code"),
-            Variable("Pluvio(9)", VarType.ALIAS, value = "pluv_gagestat", units="code")
+            Variable("Pluvio(1)", VarType.ALIAS, value="ppt_max_rate", units="mm hr-1"),
+            Variable("Pluvio(2)", VarType.ALIAS, value="ppt", units="mm"),
+            Variable("Pluvio(3)", VarType.ALIAS, value="pluv_accuNRT", units="mm"),
+            Variable("Pluvio(4)", VarType.ALIAS, value="pluv_accuTtlNRT", units="mm"),
+            Variable("Pluvio(5)", VarType.ALIAS, value="pluv_fill", units="mm"),
+            Variable("Pluvio(6)", VarType.ALIAS, value="pluv_bucketNRT", units="mm"),
+            Variable("Pluvio(7)", VarType.ALIAS, value="pluv_temp", units="deg C"),
+            Variable("Pluvio(8)", VarType.ALIAS, value="pluv_heater", units="code"),
+            Variable("Pluvio(9)", VarType.ALIAS, value="pluv_gagestat", units="code"),
         ]
 
         return super().__post_init__()
-    
+
     @property
     def tables(self) -> list[Table]:
-        return [
-            Table(
-                "FiveMin",
-                TableItem(
-                    functions.Totalize()
-                )
-            )
-        ]
+        return [Table("FiveMin", TableItem(functions.Totalize()))]
 
 
 INSTRUMENTS = {
