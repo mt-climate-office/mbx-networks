@@ -29,9 +29,7 @@ class Program:
 
     transform: Callable[["Program"], "Program"] | None = None
 
-
     def __post_init__(self):
-
         if self.transform is not None:
             self._transform()
 
@@ -40,7 +38,7 @@ class Program:
         self.__group_slow_sequence()
         self.__check_unique_names()
         self.__validate_dependencies()
-    
+
     def _transform(self):
         self.transform(self)
 
@@ -163,7 +161,7 @@ class Program:
             except NotImplementedError:
                 continue
 
-        s += "NextScan\n\n"
+        s += "    NextScan\n\n"
 
         s += indent(self.slow_sequence, "    ")
 
@@ -179,21 +177,21 @@ def rename_soil(i: Instrument) -> None:
         if not re.search(pattern, v.name):
             v.rename_to = f"{v.name}_{i.elevation:04}_id{i.sdi12_address}"
 
+
 def soil_slow_seq_match(p: Program) -> None:
     probes = []
-    
+
     for i in p.instruments:
         if i.type == "Soil":
             probes.append(i)
-    
+
     first: Acclima_TDR310N = probes.pop(0)
     ss_logic = first.slow_sequence.logic
     for probe in probes:
         if ss_logic == (new_logic := probe.slow_sequence.logic):
             ss_logic += new_logic
         probe.slow_sequence = None
-    
-        ...
+
 
 my_sensors = [
     Vaisala_HMP155(200),
@@ -204,6 +202,8 @@ my_sensors = [
     RMYoung_05108_77(1000),
 ]
 
-program = Program("test program", my_sensors, "SequentialMode", True, transform=soil_slow_seq_match)
+program = Program(
+    "test program", my_sensors, "SequentialMode", True, transform=soil_slow_seq_match
+)
 
 print(program.construct())

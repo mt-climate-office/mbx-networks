@@ -11631,7 +11631,15 @@ def WindVector(
     | Integer
     | ConstantInteger,
     DataType: Literal[
-        "String", "Boolean", "BOOL8", "Long", "NSEC", "UINT1", "UINT2", "UINT4"
+        "String",
+        "Boolean",
+        "BOOL8",
+        "Long",
+        "NSEC",
+        "UINT1",
+        "UINT2",
+        "UINT4",
+        "FP2",
     ],
     DisableVar: Variable | Constant | Expression,
     Subinterval: Variable | Constant | Expression | Array | Integer | ConstantInteger,

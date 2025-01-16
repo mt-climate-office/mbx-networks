@@ -47,11 +47,14 @@ class If:
 
     def __eq__(self, other: "If") -> bool:
         return self.initial_condition == other.initial_condition
-    
+
     def __add__(self, other: "If") -> "If":
-        assert self == other, "The two If objects are not equal. They must have identical If conditions."
+        assert self == other, (
+            "The two If objects are not equal. They must have identical If conditions."
+        )
         self.logic = f"{self.logic}\n    {other.logic}"
         return self
+
 
 class For:
     def __init__(

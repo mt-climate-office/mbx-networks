@@ -161,12 +161,18 @@ class WireOptions(Enum):
     SE7 = "7"
     SE8 = "8"
     SE9 = "9"
+    SE10 = "10"
+    SE11 = "11"
+    SE12 = "12"
+    SE13 = "13"
+    SE14 = "14"
     SW12_1 = "SW12_1"
     SW12_2 = "SW12_2"
     AG = "AG"
     RG2 = "RG2"
     G = "G"
     _12V = "12V"
+    _5V = "5V"
 
     def __str__(self):
         return self.value
@@ -175,7 +181,7 @@ class WireOptions(Enum):
 @dataclass
 class Wire:
     wire: str
-    port: WireOptions
+    port: WireOptions | None
     description: Optional[str] = ""
 
     def __str__(self):
@@ -209,7 +215,7 @@ class Instrument(ABC):
     wires: WiringDiagram = field(init=False, default=None)
     variables: list[Variable] | dict[str, Variable] = field(init=False, default=None)
     dependencies: dict[str, Instrument] | None = field(init=False, default=None)
-    _slow_sequence: SlowSequence | str| None = field(init=False, default='initial')
+    _slow_sequence: SlowSequence | str | None = field(init=False, default="initial")
 
     elevation: int | None = None
     sdi12_address: str | None = None
@@ -409,7 +415,98 @@ class RMYoung_05108_77(Instrument):
                 ).Else(f"{self.variables['wind_timer']} = 0"),
             ]
         )
-        
+
+
+class RMYoung_09106(Instrument):
+    def __post_init__(self):
+        self.manufacturer = "RM Young"
+        self.model = "09106"
+        self.type = "Wind"
+
+        self.wires = WiringDiagram(
+            Wire("Red", WireOptions._12V, "12v Power"),
+            Wire("White", WireOptions.AG, "Signal G"),
+            Wire("Clear", WireOptions.AG, "Signal G"),
+            Wire("Green", WireOptions.SE13, "WD Signal"),
+            Wire("Brown", WireOptions.SE14, "WS Signal"),
+            Wire("Black", WireOptions.G, "Power Ground"),
+        )
+        self.variables = [
+            Variable("wind_spd", VarType.PUBLIC, units="m s-1"),
+            Variable("wind_dir", VarType.PUBLIC, units="arcdeg"),
+            Variable("wind_timer", VarType.PUBLIC, units="sec"),
+        ]
+        return super().__post_init__()
+
+    @property
+    def tables(self) -> list[Table]:
+        return [
+            Table(
+                "FiveMin",
+                TableItem(
+                    functions.WindVector(
+                        1,
+                        self.variables["wind_spd"],
+                        self.variables["wind_dir"],
+                        "FP2",
+                        False,
+                        0,
+                        0,
+                        0,
+                    ),
+                    field_names=[
+                        self.variables["wind_spd"],
+                        self.varaibles["wind_dir"],
+                        f"{self.variables['wind_dir']}_sd",
+                    ],
+                ),
+                TableItem(
+                    functions.Maximum(
+                        1, self.variables["wind_spd", "FP2", False, False]
+                    ),
+                    ["windgust"],
+                ),
+            )
+        ]
+
+    @property
+    def program(self) -> str:
+        "\n".join(
+            [
+                functions.VoltSE(
+                    self.variables["wind_spd"],
+                    1,
+                    "mv5000",
+                    self.wires["Green"],
+                    0,
+                    0,
+                    15000,
+                    0.020,
+                    0,
+                ),
+                functions.VoltSE(
+                    self.variables["wind_dir"],
+                    1,
+                    "mv5000",
+                    self.wires["Brown"],
+                    0,
+                    0,
+                    15000,
+                    0.108,
+                    0,
+                ),
+                If(
+                    self.variable["wind_dir"] > 360,
+                    logic=f"{self.variables['wind_dir']}={self.variables['wind_dir']}-360",
+                ),
+                If(
+                    self.variables["wind_spd"],
+                    "<=",
+                    0,
+                    logic=f"{self.variables['wind_dir']} = NAN\n{self.variables['wind_timer']}=3",
+                ).Else(f"{self.variables['wind_timer']} = 0"),
+            ]
+        )
 
 
 class Setra_CS100(Instrument):
@@ -566,7 +663,6 @@ class Vaisala_HMP155(Instrument):
 
 class Acclima_TDR310N(Instrument):
     def __post_init__(self):
-
         self.model = "Acclima"
         self.manufacturer = "TDR-310N"
         self.type = "Soil"
@@ -671,7 +767,7 @@ class Acclima_TDR310N(Instrument):
 
     @property
     def slow_sequence(self) -> SlowSequence | None | str:
-        if self._slow_sequence == 'initial':
+        if self._slow_sequence == "initial":
             self._slow_sequence = SlowSequence(
                 "soil",
                 Scan(1, "Min", 0, 0),
@@ -688,9 +784,9 @@ class Acclima_TDR310N(Instrument):
                     ),
                 ),
             )
-    
+
         return self._slow_sequence
-    
+
     @slow_sequence.setter
     def slow_sequence(self, value: SlowSequence | None):
         self._slow_sequence = value
@@ -900,7 +996,6 @@ class Generic_IPCamera(Instrument):
 
 
 class EnviroCams_iPatrol(Generic_IPCamera):
-
     def __post_init__(self):
         self.manufacturer = "EnviroCams"
         self.model = "iPatrol PTZ"
@@ -910,13 +1005,183 @@ class EnviroCams_iPatrol(Generic_IPCamera):
 
 
 class EnviroCams_Scout(Generic_IPCamera):
-
     def __post_init__(self):
         self.manufacturer = "EnviroCams"
         self.model = "Scout PTZ"
         self.type = "IP Camera"
-        
+
         return super().__post_init__()
+
+
+class SparkFun_Door_Switch(Instrument):
+    def __post_init__(self):
+        self.manufacturer = "SparkFun"
+        self.model = "Door Switch"
+        self.type = "Door"
+
+        self.wires = WiringDiagram(
+            Wire("Red", WireOptions._5V, "5v Power"),
+            Wire("Black", WireOptions.C4, "Open/Closed Status"),
+        )
+
+        self.variables = [
+            Variable("door", VarType.PUBLIC),
+            Variable("door_timer", VarType.PUBLIC, DataType.LONG, units="sec"),
+        ]
+        return super().__post_init__()
+
+    @property
+    def tables(self) -> list[Table]:
+        return [
+            Table(
+                "FiveMin",
+                TableItem(
+                    functions.Maximum(1, self.variables["door"], "FP2", False, False),
+                    [self.variables["door"]],
+                ),
+            ),
+            Table(
+                "StatusReport",
+                TableItem(
+                    functions.Maximum(
+                        1, self.variables["door_timer"], "UINT4", False, False
+                    ),
+                    [self.variables["door_timer"]],
+                ),
+            ),
+        ]
+
+    @property
+    def program(self) -> str:
+        return "\n".join(
+            [
+                If(
+                    functions.CheckPort(self.wires["Black"]),
+                    logic="\n".join(
+                        [
+                            f"{self.variables['door']} = 0",
+                            f"{self.variables['door_timer']} = 0",
+                            functions.Timer(1, "2", "3"),
+                        ]
+                    ),
+                ).Else(
+                    "\n".join(
+                        [
+                            functions.Timer(1, "2", "0"),
+                            f"{self.variables['door_timer']} = {functions.Timer(1, '2', '4')}",
+                            If(
+                                self.variables["door_timer"],
+                                ">",
+                                14400,
+                                logic=f"{self.variables['door']} = 0",
+                            ).Else(f"{self.variables['door']} = 1"),
+                        ]
+                    )
+                )
+            ]
+        )
+
+
+class OTT_PLS500(Instrument):
+    def __post_init__(self):
+        self.manufacturer = "OTT"
+        self.model = "PLS 500"
+        self.type = "Pressure Probe"
+        assert self.sdi12_address is not None, (
+            "An SDI12 Address must be specified for this device."
+        )
+
+        self.wires = WiringDiagram(
+            Wire("Blue", WireOptions.G),
+            Wire("Red", WireOptions._12V, "(on CR1000X)"),
+            Wire("Grey", WireOptions.C5),
+        )
+
+        self.variables = [
+            Variable("Transducer(3)", var_type=VarType.PUBLIC),
+            Variable("Transducer(1)", VarType.ALIAS, value="well_lvl", units="m"),
+            Variable("Transducer(2)", VarType.ALIAS, value="well_tmp", units="deg C"),
+            Variable("Transducer(3)", VarType.ALIAS, value="well_status"),
+        ]
+        return super().__post_init__()
+
+    @property
+    def tables(self) -> list[Table]:
+        return [
+            Table(
+                "FiveMin",
+                TableItem(
+                    functions.Average(1, self.variables["well_lvl"], "FP2", False),
+                    [self.variables["well_lvl"]],
+                ),
+                TableItem(
+                    functions.Average(1, self.variables["well_tmp"], "FP2", False),
+                    [self.variables["well_tmp"]],
+                ),
+                TableItem(
+                    functions.Sample(1, self.variables["well_status"], "FP2", False),
+                    [self.variables["well_status"]],
+                ),
+            ),
+        ]
+
+    @property
+    def slow_sequence(self) -> SlowSequence:
+        SlowSequence(
+            "Transducer",
+            Scan(1, "Min", 0, 0),
+            functions.SDI12Recorder(
+                self.variables["Transducer(3)"].replace("(3)", ""),
+                self.wires["Grey"],
+                self.sdi12_address,
+                "M!",
+                1,
+                0,
+                -1,
+                1,
+            ),
+        )
+
+class OTT_Pluvio(Instrument):
+    def __post_init__(self):
+        self.manufacturer = "OTT"
+        self.model = "Pluvio2_L_400"
+        self.type = "Precipitation"
+
+        self.wires = WiringDiagram(
+            Wire("Black", None, "DC Converter blac (out) (#1 not used)"),
+            Wire("Green", WireOptions.C5, "SDI-12 data SDI_ADD: 2"),
+            Wire("White", WireOptions.G, "Data Ground"),
+            Wire("Red", None, "24V DC Converter Out (Yellow)"),
+            Wire("Yellow", WireOptions._12V, "12v Power"),
+            Wire("Brown", WireOptions.G, "Power Ground")
+        )
+
+        self.variables = [
+            Variable("Pluvio(9)", VarType.PUBLIC),
+            Variable("Pluvio(1)", VarType.ALIAS, value = "ppt_max_rate", units = "mm hr-1"),
+            Variable("Pluvio(2)", VarType.ALIAS, value = "ppt", units="mm"),
+            Variable("Pluvio(3)", VarType.ALIAS, value = "pluv_accuNRT", units="mm"),
+            Variable("Pluvio(4)", VarType.ALIAS, value = "pluv_accuTtlNRT", units="mm"),
+            Variable("Pluvio(5)", VarType.ALIAS, value = "pluv_fill", units="mm"),
+            Variable("Pluvio(6)", VarType.ALIAS, value = "pluv_bucketNRT", units="mm"),
+            Variable("Pluvio(7)", VarType.ALIAS, value = "pluv_temp", units="deg C"),
+            Variable("Pluvio(8)", VarType.ALIAS, value = "pluv_heater", units="code"),
+            Variable("Pluvio(9)", VarType.ALIAS, value = "pluv_gagestat", units="code")
+        ]
+
+        return super().__post_init__()
+    
+    @property
+    def tables(self) -> list[Table]:
+        return [
+            Table(
+                "FiveMin",
+                TableItem(
+                    functions.Totalize()
+                )
+            )
+        ]
 
 
 INSTRUMENTS = {
