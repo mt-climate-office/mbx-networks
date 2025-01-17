@@ -173,6 +173,23 @@ class WireOptions(Enum):
     G = "G"
     _12V = "12V"
     _5V = "5V"
+    DIFF_1_H = "1"
+    DIFF_1_L = "1"
+    DIFF_2_H = "2"
+    DIFF_2_L = "2"
+    DIFF_3_H = "3"
+    DIFF_3_L = "3"
+    DIFF_4_H = "4"
+    DIFF_4_L = "4"
+    DIFF_5_H = "5"
+    DIFF_5_L = "5"
+    DIFF_6_H = "6"
+    DIFF_6_L = "6"
+    DIFF_7_H = "7"
+    DIFF_7_L = "7"
+    DIFF_8_H = "8"
+    DIFF_8_L = "8"
+
 
     def __str__(self):
         return self.value
@@ -214,7 +231,6 @@ class Instrument(ABC):
     type: str = field(init=False)
     wires: WiringDiagram = field(init=False, default=None)
     variables: list[Variable] | dict[str, Variable] = field(init=False, default=None)
-    dependencies: dict[str, Instrument] | None = field(init=False, default=None)
     _slow_sequence: SlowSequence | str | None = field(init=False, default="initial")
 
     elevation: int | None = None
@@ -929,6 +945,8 @@ class CR1000X_PanelTemp(Instrument): ...
 
 
 class Generic_IPCamera(Instrument):
+    voltage: CR1000X_Battery | ProStar_EMC1
+
     def __post_init__(self):
         self.wires = WiringDiagram(
             [
@@ -948,11 +966,6 @@ class Generic_IPCamera(Instrument):
         ]
 
         return super().__post_init__()
-
-    def _check_dependencies(self):
-        assert "battery" in self.dependencies, (
-            "This insturment must have a battery voltage instrument in the same program to run."
-        )
 
     @property
     def pre_scan(self):
@@ -979,9 +992,9 @@ class Generic_IPCamera(Instrument):
                     ),
                     str(
                         If(
-                            self.dependencies["battery"].variables["batt_volt"],
+                            self.voltage.variables["batt_volt"],
                             "<",
-                            self.dependencies["battery"].variables["shutoff_voltage"],
+                            self.voltage.variables["shutoff_voltage"],
                             logic=f"{self.variables['Camera_Power']}=false",
                         )
                     ),
@@ -1169,13 +1182,304 @@ class OTT_Pluvio(Instrument):
             Variable("Pluvio(7)", VarType.ALIAS, value="pluv_temp", units="deg C"),
             Variable("Pluvio(8)", VarType.ALIAS, value="pluv_heater", units="code"),
             Variable("Pluvio(9)", VarType.ALIAS, value="pluv_gagestat", units="code"),
+            Variable("pluv_flag", VarType.PUBLIC, value = 1)
         ]
 
         return super().__post_init__()
 
     @property
     def tables(self) -> list[Table]:
-        return [Table("FiveMin", TableItem(functions.Totalize()))]
+        return [
+            Table(
+                "FiveMin", 
+                TableItem(functions.Totalize(1, self.variables["ppt"], "IEEE4", self.variables["pluv_flag"]), ["ppt"]),
+                TableItem(functions.Maximum(1, self.variable["ppt_max_rate"], "IEEE4", False, False), ["ppt_max_rate"]),
+                TableItem(functions.Sample(1, self.variables["pluv_fill"], "IEEE4", False), ["pluv_fill"]),
+                TableItem(functions.Sample(1, self.variables["pluv_heater"], "FP2", False), ["pluv_heater"])
+            ),
+            Table(
+                "StatusReport",
+                TableItem(functions.Sample(1, self.variables["pluv_gagestat"], "FP2", False)),
+                TableItem(functions.Sample(1, self.variables["pluv_temp"], "FP2", False)),
+                data_interval=DataInterval(0, 120, "min", 10)
+            )
+        ]
+
+
+    @property
+    def end_scan(self) -> str:
+        return f"{self.variables["pluv_flag"]} = 1"
+    
+    @property
+    def slow_sequence(self) -> SlowSequence:
+        return SlowSequence(
+            "pluvio",
+            Scan(1, "Min", 0, 0),
+            logic = "\n".join([
+                functions.SDI12Recorder(
+                    self.variables["Pluvio(9)"].name.replace("9", ""),
+                    self.wires["Green"],
+                    self.sdi12_address,
+                    "C!",
+                    1,
+                    0
+                    -1,
+                    1
+                ),
+                f"{self.variables["pluv_flag"]} = 0"
+            ])
+        )
+
+class Sierra_RV50X(Instrument):
+    voltage: CR1000X_Battery | ProStar_EMC1
+
+    def __post_init__(self):
+        self.manufacturer = "Sierra Wireless"
+        self.model = "RV50X"
+        self.type = "Modem"
+
+        self.wires = WiringDiagram(
+            Wire("Black", WireOptions.G),
+            Wire("Red", WireOptions._12V, "(On CR1000X)"),
+            Wire("White", WireOptions.SW12_2),
+        )
+
+        self.variables = [Variable("Modem_Power", VarType.PUBLIC, DataType.BOOLEAN)]
+
+        return super().__post_init__()
+
+    @property
+    def pre_scan(self) -> str:
+        return f"{self.variables['Modem_Power']} = True"
+
+    @property
+    def program(self) -> str:
+        return "\n".join(
+            [
+                If(
+                    functions.TimeIsBetween(2, 3, 1440, "min"),
+                    logic=f"{self.variables['Modem_Power']} = False",
+                ).Else(f"{self.variables['Modem_Power']} = True"),
+                If(
+                    self.voltage.variables["batt_volt"],
+                    "<",
+                    self.voltage.variables["shutoff_voltage"],
+                    logic=If(
+                        functions.TimeIsBetween(1, 4, 240, "min"),
+                        logic=f"{self.variables['Modem_Power']} = True",
+                    ).Else(f"{self.variables['Modem_Power']} = False"),
+                ),
+                functions.SW12(self.wires["White"], self.variables["Modem_Power"]),
+            ]
+        )
+
+
+class Campbell_SnowVue10(Instrument):
+    temperature: Vaisala_HMP155
+
+    def __post_init__(self):
+        self.manufacturer = "Campbell Scientific"
+        self.model = "SnowVue10"
+        self.type = "Snow"
+
+        self.wires = WiringDiagram(
+            Wire("White", WireOptions.C1, "SDI-12 data SDI_ADD: 1"),
+            Wire("Brown", WireOptions._12V, "Fuse Block 0.5A fuse power"),
+            Wire("Black", WireOptions.G, "Power Ground"),
+            Wire("Clear", WireOptions.AG)
+        )
+
+        self.variables = [
+            Variable("SnowVUE_Go", VarType.PUBLIC, DataType.BOOLEAN),  # When true, runs the SnowVUE10 measurement cycle
+            Variable("Set_D2G", VarType.PUBLIC, DataType.BOOLEAN),  # When true, sets the SnowVUE10 distance to ground
+            Variable("SnowVUE(2)", VarType.PUBLIC),  # General SnowVUE variable
+            Variable("Dist2Gnd", VarType.PUBLIC, units="m"),  # Distance to ground
+            Variable("SnowVUE(1)", VarType.ALIAS, value="Dist2Targ", units="m"),  # Distance from the SnowVUE10 to target
+            Variable("TCDT", VarType.PUBLIC, units="m"),  # Final temperature-corrected distance
+            Variable("snow_depth", VarType.PUBLIC, units="cm"),  # Snow depth
+            Variable("snow_min", VarType.PUBLIC, units="cm"),  # Used to store snow_depth < 0
+            Variable("SnowVUE(2)", VarType.ALIAS, value="snow_depth_q"),  # Measurement quality number
+            Variable("FH", VarType.DIM, DataType.LONG),  # File Handle to use to set distance to ground
+            Variable("dummystr", VarType.DIM, DataType.STRING),  # Dummy string variable
+            Variable("SnowVUE_Meta(8)", VarType.PUBLIC),  # Metadata calls
+            Variable("SnowVUE_Meta(2)", VarType.ALIAS, value="IntTemp", units="deg C"),  # Temperature inside sensor housing
+            Variable("SnowVUE_Meta(3)", VarType.ALIAS, value="IntRH", units="%"),  # Relative Humidity inside sensor housing
+            Variable("SnowVUE_Meta(4)", VarType.ALIAS, value="Pitch", units="deg"),  # Tilt (degrees) front to back
+            Variable("SnowVUE_Meta(5)", VarType.ALIAS, value="Roll", units="deg"),  # Tilt (degrees) side to side
+            Variable("SnowVUE_Meta(6)", VarType.ALIAS, value="SupVolt", units="v"),  # Voltage of supply from power source
+            Variable("SnowVUE_Meta(7)", VarType.ALIAS, value="ResFreq", units="kHz"),  # Resonate Frequency of Transducer
+            Variable("SnowVUE_Meta(8)", VarType.ALIAS, value="Alert", units="unitless"),  # Alert flag if ResFreq is out of tolerance
+        ]
+
+        return super().__post_init__()
+    
+
+    @property
+    def tables(self) -> list[Table]:
+        return [
+            Table(
+                "FiveMin",
+                TableItem(
+                    functions.Sample(1, self.variables["snow_depth"], "FP2"),
+                    field_names=["snow_depth"],
+                ),
+                TableItem(
+                    functions.Sample(1, self.variables["snow_depth_q"], "FP2"),
+                    field_names=["snow_depth_q"],
+                ),
+                size=-1,
+                data_interval=DataInterval(),
+                card_out=CardOut(),
+            ),
+            Table(
+                "StatusReport",
+                TableItem(
+                    functions.Minimum(
+                        1, self.variables["snow_min"], "FP2", False, False
+                    ),
+                    field_names=["snow_min"],
+                ),
+                size=-1,
+                card_out=CardOut(),
+                data_interval=DataInterval(0, 120, "min", 10),
+            ),
+        ]    
+    
+    @property
+    def pre_scan(self) -> str:
+        return "\n".join([
+            If(functions.FileSize("USR:Dist2Gnd.txt"), ">", 0, 
+               logic = "\n".join([
+                   f"{self.variables["FH"]} = {functions.FileOpen("USR:Dist2Gnd.txt", "r", 0)}",
+                   functions.FileRead(self.variables["FH"], self.variables["dummystr"],10),
+                   functions.SplitStr(self.variables["Dist2Gnd"],self.variables["dummystr"],"",1,0),
+                   functions.FileClose(self.variables['FH'])
+               ])).Else(
+                   f"{self.variables["Dist2Gnd"]} = 1.9"
+               )
+        ])
+
+    @property
+    def program(self) -> str:
+        return "\n".join([
+            If(functions.IfTime(237, 300, "Sec"), logic=f"{self.variables["SnowVUE_Go"]} = True"),
+            If(self.variables["Set_D2G"], logic = f"{self.variables["SnowVUE_Go"]} = True")
+        ]) 
+    
+    @property
+    def slow_sequence(self) -> SlowSequence:
+        return SlowSequence(
+            "Snow",
+            Scan(1, "Min", 0, 0),
+            logic = "\n".join([If(
+                self.variables["SnowVUE_Go"],
+                logic = "\n".join([
+                    functions.SDI12Recorder(
+                        self.variables["SnowVUE(2)"].name.replace("2", ""), self.wires["White"], self.sdi12_address, "M1!", 1, 0, -1
+                    ),
+                    functions.SDI12Recorder(
+                        self.variables["SnowVUE_Meta(8)"].name.replace("8", ""), self.wires["White"], self.sdi12_address, "M9!", 1, 0, -1
+                    )
+                ])
+            ),
+            f"{self.variables["SnowVUE_Go"]} = False",
+            f"{self.variables["TCDT"]} = {self.variables["Dist2Targ"]}*{functions.Sqr(f"({self.Vaisala_HMP155.variables["air_temp"]}+273.15)/273.15")}",
+            f"{self.variables['snow_depth']} = ({self.variables['Dist2Gnd']} - {self.variables['TCDT']}) * 100",
+            If(
+                self.variables['snow_depth'], "<", "0",
+                logic=[
+                    f"{self.variables['snow_min']} = {self.variables['snow_depth']}",
+                    f"{self.variables['snow_depth']} = 0",
+                ],
+            ),
+            If(
+                self.variables['Set_D2G'],
+                logic=[
+                    f"{self.variables['Dist2Gnd']} = {self.variables['TCDT']}",
+                    f'{self.variables["FH"]} = {functions.FileOpen("USR:Dist2Gnd.txt", "w", 0)}',
+                    functions.Sprintf(self.variables["dummystr"], r"%f", self.variables["Dist2Gnd"]),
+                    functions.FileWrite(self.variables["FH"], self.variables["dummystr"], 0),
+                    functions.FileClose(self.variables["FH"]),
+                    f"{self.variables['Set_D2G']} = False",
+                ],
+            )
+])
+        )
+
+
+class Apogee_SP510(Instrument):
+    pyran_calib: float
+
+    def __post_init__(self):
+        self.manufacturer = "Apogee"
+        self.model = "SP-510 SS"
+        self.type = "Pyranometer"
+
+        self.wires = WiringDiagram(
+            Wire("White", WireOptions.DIFF_2_H, "Signal Positive"),
+            Wire("Black", WireOptions.DIFF_2_L, "Signal Negative"),
+            Wire("Clear", WireOptions.AG, "Shield Ground"),
+            Wire("Yellow", WireOptions._12V, "Fuse block 0.5A fuse heater"),
+            Wire("Blue", WireOptions.G, "Power ground for heater")
+        )
+
+        self.variables = [
+            Variable("sol_rad", VarType.PUBLIC, units="W m-2"),
+            Variable("sol_min", VarType.PUBLIC, units="W m-2"),
+            Variable("pyran_calib", VarType.PUBLIC),
+        ]
+        return super().__post_init__()
+
+    @property
+    def tables(self) -> list[Table]:
+        return [
+            Table(
+                "FiveMin",
+                TableItem(
+                    functions.Average(
+                        1,
+                        self.variables["sol_rad"],
+                        "FP2",
+                        False,
+                    ),
+                    field_names=[self.variables["sol_rad"]],
+                ),
+                size=-1,
+                data_interval=DataInterval(),
+                card_out=CardOut(),
+            ),
+            Table(
+                "StatusReport",
+                TableItem(
+                    functions.Minimum(
+                        1,
+                        self.variables["sol_min"],
+                        "FP2",
+                        False,
+                        False,
+                    ),
+                    field_names=[self.variables["sol_min"]],
+                ),
+                size=-1,
+                card_out=CardOut(),
+                data_interval=DataInterval(0, 120, "min", 10),
+            ),
+        ]
+    
+    @property
+    def pre_scan(self) -> str:
+        return f"{self.variables["pyran_calib"]} = {self.pyran_calib}"
+
+    @property 
+    def program(self) -> str:
+        return "\n".join([
+            functions.VoltDiff(self.variables["sol_rad"], 1, 'mv200', self.wires["White"], True, 0, "60", self.variables["pyran_calib"], 0),
+            If(self.variables["sol_rad"], "<", 0,
+               logic = [
+                   f"{self.variables["sol_min"]} = {self.variables["sol_rad"]}",
+                   f"{self.variables["sol_rad"]} = 0"
+               ])
+        ])
 
 
 INSTRUMENTS = {

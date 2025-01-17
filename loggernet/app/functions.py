@@ -6931,6 +6931,7 @@ def Maximum(
         "UINT2",
         "UINT4",
         "FP2",
+        "IEEE4"
     ],
     DisableVar: Variable | Constant | Expression,
     Time: Literal["0", "1"],
@@ -8430,6 +8431,7 @@ def Sample(
         "UINT2",
         "UINT4",
         "FP2",
+        "IEEE4"
     ],
 ) -> str:
     """For a full description of this function, visit [https://help.campbellsci.com/crbasic/cr1000x/Content/Instructions/sample.htm](https://help.campbellsci.com/crbasic/cr1000x/Content/Instructions/sample.htm).
