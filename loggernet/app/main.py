@@ -1,50 +1,14 @@
-from fastapi import FastAPI, File, UploadFile, HTTPException, Depends
+from fastapi import FastAPI, File, UploadFile, HTTPException, Depends, Query
 from fastapi.responses import JSONResponse
 import subprocess
 from sqlalchemy.orm import Session
 import uuid
 import os
-
-from app.db import get_db, init_db, Instruments
-
+from app.schemas import valid_instruments
+from app.instruments import INSTRUMENTS, Instrument
+from typing import Annotated
 
 app = FastAPI()
-
-
-# Lifespan event to initialize the database
-@app.on_event("startup")
-def startup_event():
-    init_db()
-
-
-# POST endpoint to add a new record
-@app.post("/instrument/")
-def create_record(
-    long_name: str, short_name: str, data: dict, db: Session = Depends(get_db)
-):
-    record_id = str(uuid.uuid4())  # Generate a unique ID
-    new_record = Instruments(
-        id=record_id, long_name=long_name, short_name=short_name, data=data
-    )
-    db.add(new_record)
-    db.commit()
-    db.refresh(new_record)
-    return {"id": record_id, "message": "Record created successfully"}
-
-
-# GET endpoint to fetch a record by short_name
-# TODO: Swap this to use instruments.py rather than db.
-@app.get("/instrument/{short_name}")
-def get_record(short_name: str, db: Session = Depends(get_db)):
-    record = db.query(Instruments).filter(Instruments.short_name == short_name).first()
-    if not record:
-        raise HTTPException(status_code=404, detail="Record not found")
-    return {
-        "id": record.id,
-        "long_name": record.long_name,
-        "short_name": record.short_name,
-        "data": record.data,
-    }
 
 
 @app.get("/")
@@ -68,14 +32,15 @@ async def check_compile(file: UploadFile = File(...)):
                 text=True,
                 cwd="/home/wine",
             )
-            if "Failed" in output:
+            if "Compiled in" in output:
                 return JSONResponse(
-                    content={"message": "Compilation failed", "details": output},
-                    status_code=400,
+                    content={"message": "Compilation succeeded", "output": output},
+                    status_code=200,
                 )
+
             return JSONResponse(
-                content={"message": "Compilation succeeded", "output": output},
-                status_code=200,
+                content={"message": "Compilation failed", "details": output},
+                status_code=400,
             )
         except subprocess.CalledProcessError as e:
             # Handle errors from the command
@@ -87,3 +52,42 @@ async def check_compile(file: UploadFile = File(...)):
     finally:
         if os.path.exists(temp_file_path):
             os.remove(temp_file_path)
+
+
+@app.get("/instruments")
+async def get_instruments():
+    instances = []
+    for name, instrument in INSTRUMENTS.items():
+        instances.append(instrument(elevation=1, sdi12_address=1))
+        ...
+    # TODO: Make this return a nice json response of each instrument
+    return {"cool": "stuff"}
+
+
+@app.get("/instruments/{instrument}")
+async def get_instrument(instrument: valid_instruments):
+    instance = INSTRUMENTS[instrument](elevation=1, sdi12_address=1)
+    # TODO: Make this return a nice json response of each instrument
+
+    return instance
+
+
+@app.get("/program")
+async def build_program(
+    instrument: Annotated[list[Instrument], Query(..., help="A list of instruments you would like to build a program for.")]
+):
+    #TODO: this
+    ...
+
+@app.get("/program/{station}")
+async def build_program_from_station(
+    station: str
+):
+    #TODO: This
+    ...
+
+
+@app.get("/program/build")
+async def program_builder_form():
+    # TODO: simple html form that hist the "/program" endpoint
+    ...

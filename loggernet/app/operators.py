@@ -1,4 +1,4 @@
-from functions import Variable
+from app.functions import Variable
 
 
 class If:

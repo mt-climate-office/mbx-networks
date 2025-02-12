@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-import functions
-from functions import Variable, VarType, DataType
+from app import functions
+from app.functions import Variable, VarType, DataType
 from typing import Literal, Optional, Callable
 from abc import ABC
 from enum import Enum
-from operators import If, For
+from app.operators import If, For
 from textwrap import indent
 
 
@@ -537,7 +537,7 @@ class Setra_CS100(Instrument):
             Wire("Clear", WireOptions.AG, "Signal G"),
             Wire("Red", WireOptions._12V, "12v Power"),
             Wire("Black", WireOptions.G, "Power Ground"),
-            WireOptions("Green", WireOptions.C2, "Control"),
+            Wire("Green", WireOptions.C2, "Control"),
         )
         self.variables = [Variable("bp", VarType.PUBLIC, units="kPa")]
         return super().__post_init__()
