@@ -1,10 +1,10 @@
-from fastapi import FastAPI, File, UploadFile, HTTPException, Depends, Query
+from fastapi import FastAPI, File, UploadFile, HTTPException, Depends, Query,Path
 from fastapi.responses import JSONResponse
 import subprocess
 from sqlalchemy.orm import Session
 import uuid
 import os
-from app.schemas import valid_instruments
+from app.schemas import ValidInstruments
 from app.instruments import INSTRUMENTS, Instrument
 from typing import Annotated
 
@@ -65,7 +65,7 @@ async def get_instruments():
 
 
 @app.get("/instruments/{instrument}")
-async def get_instrument(instrument: valid_instruments):
+async def get_instrument(instrument: Annotated[ValidInstruments, Path]):
     instance = INSTRUMENTS[instrument](elevation=1, sdi12_address=1)
     # TODO: Make this return a nice json response of each instrument
 
@@ -74,7 +74,7 @@ async def get_instrument(instrument: valid_instruments):
 
 @app.get("/program")
 async def build_program(
-    instrument: Annotated[list[Instrument], Query(..., help="A list of instruments you would like to build a program for.")]
+    instrument: Annotated[list[ValidInstruments], Query(..., help="A list of instruments you would like to build a program for.")]
 ):
     #TODO: this
     ...

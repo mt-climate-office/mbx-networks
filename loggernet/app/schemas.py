@@ -1,4 +1,4 @@
 from app.instruments import INSTRUMENTS
 from enum import Enum
 
-valid_instruments = Enum("ValidInstruments", {key: key for key in INSTRUMENTS.keys()})
+ValidInstruments = Enum("ValidInstruments", dict((key, key) for key in INSTRUMENTS.keys()))

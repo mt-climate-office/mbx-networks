@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, asdict
 from app import functions
 from app.functions import Variable, VarType, DataType
-from typing import Literal, Optional, Callable
+from typing import Literal, Optional, Callable, Any
 from abc import ABC
 from enum import Enum
 from app.operators import If, For
@@ -283,6 +283,16 @@ class Instrument(ABC):
     @property
     def slow_sequence(self) -> SlowSequence:
         raise NotImplementedError()
+    
+    def to_json(self) -> dict[str, Any]:
+        # TODO: finish.
+        return {
+            "Manufacturer": self.manufacturer,
+            "Model": self.model,
+            "Type": self.type,
+            "Wiring": [asdict(x) for x in self.wires.args],
+            "Tables": self.tables
+        }
 
     def __str__(self) -> str:
         table_str = (
@@ -820,7 +830,7 @@ class ProStar_EMC1(Instrument):
             Variable("ChgCntDat(82)", VarType.DIM, DataType.LONG),
             Variable("i", VarType.DIM),
             Variable("batt_volt", VarType.PUBLIC, units="v"),
-            Variable("shutoff_voltage", VarType.Public, units="v"),
+            Variable("shutoff_voltage", VarType.PUBLIC, units="v"),
             Variable("ChgCntDat(17)", VarType.ALIAS, value="charge_current"),
             Variable("ChgCntDat(18)", VarType.ALIAS, value="array_current"),
             Variable("ChgCntDat(19)", VarType.ALIAS, value="battery_terminal_voltage"),
@@ -938,11 +948,54 @@ class ProStar_EMC1(Instrument):
 
 
 # TODO: Implement these as defaults for if no instruments are selected.
-class CR1000X_Battery(Instrument): ...
+class CR1000X_Battery(Instrument): 
+    
+    def __post_init__(self):
+        self.manufacturer = "Campbell Scientific"
+        self.model = "CR1000X"
+        self.type = "Charge Data"
+        self.variables = [
+            Variable("batt_volt", VarType.PUBLIC, units="v"),
+            Variable("shutoff_voltage", VarType.PUBLIC)
+        ]
+        return super().__post_init__()
+    
+
+    @property
+    def tables(self) -> list[Table]:
+        [Table(
+            "FiveMin",
+            TableItem(
+                functions.Sample(1, self.variables["batt_volt"], "IEEE4"), 
+                [self.variables["batt_volt"]]
+            )
+        )]
+
+    @property
+    def pre_scan(self):
+        return f"{self.variables["shutoff_voltage"]} = 11.4"
+
+    @property
+    def program(self):
+        return functions.Battery(self.variables["batt_volt"])
 
 
-class CR1000X_PanelTemp(Instrument): ...
 
+class CR1000X_PanelTemp(Instrument):
+    def __post_init__(self):
+        self.manufacturer = "Campbell Scientific"
+        self.model = "CR1000X"
+        self.type = "Temperature"
+
+        self.variables = [
+            Variable("panel_temp", VarType.PUBLIC, units = "deg C")
+        ]
+
+        return super().__post_init__()
+    
+    @property 
+    def program(self):
+        return functions.PanelTemp(self.variables["panel_temp"], "60")
 
 class Generic_IPCamera(Instrument):
     voltage: CR1000X_Battery | ProStar_EMC1
@@ -1487,4 +1540,17 @@ INSTRUMENTS = {
     "Setra_CS100": Setra_CS100,
     "Vaisala_HMP155": Vaisala_HMP155,
     "Acclima_TDR310N": Acclima_TDR310N,
+    "RMYoung_09106": RMYoung_09106,
+    "ProStar_EMC1": ProStar_EMC1,
+    "CR1000X_Battery": CR1000X_Battery,
+    "CR1000X_PanelTemp": CR1000X_PanelTemp,
+    "Generic_IPCamera": Generic_IPCamera,
+    "EnviroCams_iPatrol": EnviroCams_iPatrol,
+    "EnviroCams_Scout": EnviroCams_Scout,
+    "SparkFun_Door_Switch": SparkFun_Door_Switch,
+    "OTT_PLS500": OTT_PLS500,
+    "OTT_Pluvio": OTT_Pluvio,
+    "Sierra_RV50X": Sierra_RV50X,
+    "Campbell_SnowVue10": Campbell_SnowVue10,
+    "Apogee_SP510": Apogee_SP510,
 }
