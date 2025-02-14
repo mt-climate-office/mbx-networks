@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Instrument Selection Panel</title>
+    <style>
+        .container {
+            max-width: 800px;
+            margin: 20px auto;
+            font-family: Arial, sans-serif;
+        }
+        .panel-container {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        .panel {
+            flex: 1;
+            border: 1px solid #ccc;
+            padding: 15px;
+            border-radius: 4px;
+            min-height: 300px;
+        }
+        .item {
+            padding: 8px;
+            margin: 5px 0;
+            background-color: #f5f5f5;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .item:hover {
+            background-color: #e0e0e0;
+        }
+        .selected-item {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .selected-item-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .remove-btn {
+            background: #ff4444;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 2px 6px;
+            cursor: pointer;
+            font-size: 12px;
+            margin-left: 4px;
+        }
+        .remove-btn:hover {
+            background: #cc0000;
+        }
+        .toggle-btn {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 2px 6px;
+            cursor: pointer;
+            font-size: 12px;
+            margin-left: 8px;
+        }
+        .toggle-btn:hover {
+            background: #45a049;
+        }
+        .attributes-panel {
+            display: none;
+            background: #fff;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin-top: 4px;
+        }
+        .attributes-panel.show {
+            display: block;
+        }
+        .attribute-row {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 4px;
+            align-items: center;
+        }
+        .attribute-label {
+            font-size: 14px;
+            min-width: 80px;
+        }
+        .attribute-input {
+            flex: 1;
+            padding: 4px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .panel-title {
+            margin-bottom: 15px;
+            font-weight: bold;
+        }
+        button.submit-btn {
+            padding: 10px 20px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        button.submit-btn:hover {
+            background-color: #0056b3;
+        }
+        #result {
+            margin-top: 20px;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="panel-container">
+            <div class="panel">
+                <div class="panel-title">Available Instruments</div>
+                <div id="available-items">
+                    <!-- Will be populated by API -->
+                </div>
+            </div>
+            <div class="panel">
+                <div class="panel-title">Selected Instruments</div>
+                <div id="selected-items"></div>
+            </div>
+        </div>
+        <button class="submit-btn" onclick="submitSelection()">Create Program</button>
+        <div id="result"></div>
+    </div>
+
+    <script>
+        let instrumentsData = [];
+
+        // Fetch instruments when page loads
+        window.addEventListener('DOMContentLoaded', async () => {
+            try {
+                const response = await fetch('/instruments');
+                const data = await response.json();
+                const container = document.getElementById('available-items');
+                
+                Object.entries(data).forEach(([key, instrument]) => {
+                    const div = document.createElement('div');
+                    div.className = 'item';
+                    div.textContent = `${instrument.Manufacturer} ${instrument.Model} (${instrument.Type})`;
+                    div.onclick = () => addItem(instrument);
+                    container.appendChild(div);
+                });
+            } catch (error) {
+                console.error('Error fetching instruments:', error);
+                document.getElementById('result').textContent = 'Error loading instruments';
+                document.getElementById('result').className = 'error';
+            }
+        });
+
+        function toggleAttributes(element) {
+            // Find the closest selected-item parent, then find the attributes-panel within it
+            const selectedItem = element.closest('.selected-item');
+            const attributesPanel = selectedItem.querySelector('.attributes-panel');
+            attributesPanel.classList.toggle('show');
+            element.textContent = attributesPanel.classList.contains('show') ? 'Hide' : 'Show';
+        }
+
+        function addItem(instrument) {
+            const selectedContainer = document.getElementById('selected-items');
+            const newItem = document.createElement('div');
+            newItem.className = 'item selected-item';
+            
+            // Create header with instrument name and buttons
+            const header = document.createElement('div');
+            header.className = 'selected-item-header';
+            
+            const textSpan = document.createElement('span');
+            textSpan.textContent = `${instrument.Manufacturer} ${instrument.Model} (${instrument.Type})`;
+            
+            const buttonContainer = document.createElement('div');
+            
+            const toggleButton = document.createElement('button');
+            toggleButton.className = 'toggle-btn';
+            toggleButton.textContent = 'Show';
+            toggleButton.onclick = (e) => {
+                e.stopPropagation();
+                toggleAttributes(toggleButton);
+            };
+            
+            const removeButton = document.createElement('button');
+            removeButton.className = 'remove-btn';
+            removeButton.textContent = '×';
+            removeButton.onclick = (e) => {
+                e.stopPropagation();
+                newItem.remove();
+            };
+            
+            buttonContainer.appendChild(toggleButton);
+            buttonContainer.appendChild(removeButton);
+            header.appendChild(textSpan);
+            header.appendChild(buttonContainer);
+            
+            // Create attributes panel
+            const attributesPanel = document.createElement('div');
+            attributesPanel.className = 'attributes-panel';
+            
+            Object.entries(instrument).forEach(([key, value]) => {
+                const row = document.createElement('div');
+                row.className = 'attribute-row';
+
+
+                if (key === 'Wiring') {
+                    if (value === "No Wiring") {
+                        const defaultWiring = {
+                            'Power': { wire: 'Red Wire', port: '12V' },
+                            'Ground': { wire: 'Black Wire', port: 'G' }
+                        };
+                        value = defaultWiring;
+                    }
+                    // Create a container for wiring inputs
+                    const wiringContainer = document.createElement('div');
+                    wiringContainer.style.marginTop = '8px';
+                    Object.entries(value).forEach(([color, locs]) => {
+                        const wireRow = document.createElement('div');
+                        // Add header for Wiring Configuration
+                        if (color === Object.keys(value)[0]) {  // Only add header for first wire
+                            const wiringHeader = document.createElement('div');
+                            wiringHeader.textContent = 'Wiring Configuration';
+                            wiringHeader.style.fontWeight = 'bold';
+                            wiringHeader.style.marginBottom = '8px';
+                            wiringContainer.appendChild(wiringHeader);
+                        }
+                        wireRow.style.display = 'flex';
+                        wireRow.style.gap = '8px';
+                        wireRow.style.marginBottom = '4px';
+                        
+                        const wireLabel = document.createElement('span');
+                        wireLabel.textContent = locs.wire;
+                        wireLabel.style.minWidth = '60px';
+                        
+                        const portInput = document.createElement('select');
+                        const options = {
+                            COM1: "ComC1", C1: "C1", C2: "C2", COM3: "ComC3", C3: "C3",
+                            C4: "C4", COM5: "ComC5", C5: "C5", C6: "C6", COM7: "ComC7",
+                            C7: "C7", C8: "C8", P1: "P1", P2: "P2", P3: "P3", P4: "P4",
+                            P5: "P5", P6: "P6", P7: "P7", VX1: "Vx1", VX2: "Vx2",
+                            SE1: "1", SE2: "2", SE3: "3", SE4: "4", SE5: "5", SE6: "6",
+                            SE7: "7", SE8: "8", SE9: "9", SE10: "10", SE11: "11",
+                            SE12: "12", SE13: "13", SE14: "14", SW12_1: "SW12_1",
+                            SW12_2: "SW12_2", AG: "AG", RG2: "RG2", G: "G", _12V: "12V",
+                            _5V: "5V", DIFF_1_H: "1", DIFF_1_L: "1", DIFF_2_H: "2",
+                            DIFF_2_L: "2", DIFF_3_H: "3", DIFF_3_L: "3", DIFF_4_H: "4",
+                            DIFF_4_L: "4", DIFF_5_H: "5", DIFF_5_L: "5", DIFF_6_H: "6",
+                            DIFF_6_L: "6", DIFF_7_H: "7", DIFF_7_L: "7", DIFF_8_H: "8",
+                            DIFF_8_L: "8"
+                        };
+                        Object.entries(options).forEach(([key, value]) => {
+                            const option = document.createElement('option');
+                            option.value = value;
+                            option.textContent = key;
+                            if (value === locs.port) option.selected = true;
+                            portInput.appendChild(option);
+                        });
+
+                        portInput.className = 'attribute-input';
+                        portInput.value = locs.port;
+                        portInput.style.flex = '1';
+                        
+                        wireRow.appendChild(wireLabel);
+                        wireRow.appendChild(portInput);
+                        wiringContainer.appendChild(wireRow);
+                    });
+                    
+                    row.appendChild(wiringContainer);
+                } else if (key == "Tables") {
+                
+                } else {
+                    const input = document.createElement('input');
+                    const label = document.createElement('span');
+                    label.className = 'attribute-label';
+                    label.textContent = key.charAt(0).toUpperCase() + key.slice(1) + ':';
+                    
+                    input.className = 'attribute-input';
+                    input.value = value;
+                    row.appendChild(input);
+                    input.setAttribute('data-attribute', key);
+                    row.appendChild(label);
+                    row.appendChild(input);
+                }
+
+                attributesPanel.appendChild(row);
+            });
+            
+            newItem.appendChild(header);
+            newItem.appendChild(attributesPanel);
+            selectedContainer.appendChild(newItem);
+            toggleAttributes(toggleButton);
+        }
+
+        async function submitSelection() {
+            const selectedItems = Array.from(document.getElementById('selected-items').children)
+                .map(item => {
+                    const name = item.querySelector('span').textContent;
+                    const attributes = {};
+                    const wiring = {}
+                    item.querySelectorAll('.attribute-input').forEach(input => {
+                        if (input.tagName.toLowerCase() === 'select') {
+                            const value = input.options[input.selectedIndex].value
+                            console.log(input);
+                        } else {
+                            const value = input.value
+                        }
+                        const value = input.tagName.toLowerCase() === 'select' ? input.options[input.selectedIndex].value : input.value;
+                        attributes[input.getAttribute('data-attribute')] = value;
+                        attributes[input.getAttribute('data-attribute')] = input.value;
+                    });
+                    return { name, attributes };
+                });
+            try {
+                const response = await fetch('/program', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ selectedItems })
+                });
+
+                const result = await response.json();
+                const resultDiv = document.getElementById('result');
+                
+                if (response.ok) {
+                    resultDiv.textContent = `Program created successfully! Program ID: ${result.program.programId}`;
+                    resultDiv.className = 'success';
+                } else {
+                    throw new Error(result.detail || 'Error creating program');
+                }
+            } catch (error) {
+                const resultDiv = document.getElementById('result');
+                resultDiv.textContent = error.message;
+                resultDiv.className = 'error';
+            }
+        }
+    </script>
+</body>
+</html>

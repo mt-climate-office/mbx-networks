@@ -62,7 +62,7 @@ class Table:
     def __init__(
         self,
         name: str,
-        *args: TableItem,
+        *table_items: TableItem,
         trig_var: str = True,
         size: int = -1,
         data_interval: DataInterval = DataInterval(),
@@ -71,7 +71,7 @@ class Table:
         self.name = name
         self.trig_var = trig_var
         self.size = size
-        self.args = args
+        self.table_items = table_items
         self.data_interval = data_interval
         self.card_out = card_out
 
@@ -81,7 +81,7 @@ class Table:
         if self.card_out:
             s += f"    {str(self.card_out)}\n"
 
-        for item in self.args:
+        for item in self.table_items:
             s += f"\n    {str(item)}"
 
         s += "\nEndTable"
@@ -285,13 +285,16 @@ class Instrument(ABC):
         raise NotImplementedError()
     
     def to_json(self) -> dict[str, Any]:
-        # TODO: finish.
+        try: 
+            tables = {x.name: x for x in self.tables} 
+        except (NotImplementedError, TypeError):
+            tables = "No tables defined for this instrument."
         return {
             "Manufacturer": self.manufacturer,
             "Model": self.model,
             "Type": self.type,
-            "Wiring": [asdict(x) for x in self.wires.args],
-            "Tables": self.tables
+            "Wiring": {x.wire: asdict(x) for x in self.wires.args} if self.wires else "No Wiring",
+            "Tables": tables
         }
 
     def __str__(self) -> str:
@@ -482,13 +485,13 @@ class RMYoung_09106(Instrument):
                     ),
                     field_names=[
                         self.variables["wind_spd"],
-                        self.varaibles["wind_dir"],
+                        self.variables["wind_dir"],
                         f"{self.variables['wind_dir']}_sd",
                     ],
                 ),
                 TableItem(
                     functions.Maximum(
-                        1, self.variables["wind_spd", "FP2", False, False]
+                        1, self.variables["wind_spd"], "FP2", False, False
                     ),
                     ["windgust"],
                 ),
@@ -883,41 +886,41 @@ class ProStar_EMC1(Instrument):
         return [
             Table(
                 "FiveMin",
-                functions.Sample(1, self.variables["batt_volt"], "FP2", False),
+                functions.Sample(1, self.variables["batt_volt"], "FP2"),
                 functions.Minimum(1, self.variables["batt_volt"], "FP2", False, False),
             ),
             Table(
                 "ChargeData",
-                functions.Sample(1, self.variables["charge_current"], "Long", False),
-                functions.Sample(1, self.variables["array_current"], "Long", False),
+                functions.Sample(1, self.variables["charge_current"], "Long"),
+                functions.Sample(1, self.variables["array_current"], "Long"),
                 functions.Sample(
-                    1, self.variables["battery_terminal_voltage"], "Long", False
+                    1, self.variables["battery_terminal_voltage"], "Long"
                 ),
-                functions.Sample(1, self.variables["load_voltage"], "Long", False),
+                functions.Sample(1, self.variables["load_voltage"], "Long"),
                 functions.Sample(
-                    1, self.variables["net_battery_current"], "Long", False
+                    1, self.variables["net_battery_current"], "Long"
                 ),
-                functions.Sample(1, self.variables["load_current"], "Long", False),
-                functions.Sample(1, self.variables["heatsink_temp"], "Long", False),
-                functions.Sample(1, self.variables["battery_temp"], "Long", False),
-                functions.Sample(1, self.variables["ambient_temp"], "Long", False),
-                functions.Sample(1, self.variables["charge_state"], "Long", False),
+                functions.Sample(1, self.variables["load_current"], "Long"),
+                functions.Sample(1, self.variables["heatsink_temp"], "Long"),
+                functions.Sample(1, self.variables["battery_temp"], "Long"),
+                functions.Sample(1, self.variables["ambient_temp"], "Long"),
+                functions.Sample(1, self.variables["charge_state"], "Long"),
                 functions.Sample(
-                    1, self.variables["total_ah_charge_hi"], "Long", False
-                ),
-                functions.Sample(
-                    1, self.variables["total_ah_charge_lo"], "Long", False
-                ),
-                functions.Sample(1, self.variables["load_state"], "Long", False),
-                functions.Sample(1, self.variables["total_ah_load_hi"], "Long", False),
-                functions.Sample(1, self.variables["total_ah_load_lo"], "Long", False),
-                functions.Sample(
-                    1, self.variables["daily_absorption_time"], "Long", False
+                    1, self.variables["total_ah_charge_hi"], "Long"
                 ),
                 functions.Sample(
-                    1, self.variables["daily_equalization_time"], "Long", False
+                    1, self.variables["total_ah_charge_lo"], "Long"
                 ),
-                functions.Sample(1, self.variables["daily_float_time"], "Long", False),
+                functions.Sample(1, self.variables["load_state"], "Long"),
+                functions.Sample(1, self.variables["total_ah_load_hi"], "Long"),
+                functions.Sample(1, self.variables["total_ah_load_lo"], "Long"),
+                functions.Sample(
+                    1, self.variables["daily_absorption_time"], "Long"
+                ),
+                functions.Sample(
+                    1, self.variables["daily_equalization_time"], "Long"
+                ),
+                functions.Sample(1, self.variables["daily_float_time"], "Long"),
             ),
         ]
 
@@ -966,7 +969,7 @@ class CR1000X_Battery(Instrument):
         [Table(
             "FiveMin",
             TableItem(
-                functions.Sample(1, self.variables["batt_volt"], "IEEE4"), 
+                functions.Sample(1, self.variables["batt_volt"], "FP2"), 
                 [self.variables["batt_volt"]]
             )
         )]
@@ -1002,14 +1005,12 @@ class Generic_IPCamera(Instrument):
 
     def __post_init__(self):
         self.wires = WiringDiagram(
-            [
-                Wire("Black", WireOptions.G, "#4 Black to Ground"),
-                Wire(
-                    "Red",
-                    WireOptions.SW12_1,
-                    "CR1000X SW1 and #2 red to fuse block (6.2A fuse)",
-                ),
-            ],
+            Wire("Black", WireOptions.G, "#4 Black to Ground"),
+            Wire(
+                "Red",
+                WireOptions.SW12_1,
+                "CR1000X SW1 and #2 red to fuse block (6.2A fuse)",
+            ),
             description="Red from camera to #1 and white to ground (yellow cable)",
         )
 
@@ -1185,7 +1186,7 @@ class OTT_PLS500(Instrument):
                     [self.variables["well_tmp"]],
                 ),
                 TableItem(
-                    functions.Sample(1, self.variables["well_status"], "FP2", False),
+                    functions.Sample(1, self.variables["well_status"], "FP2"),
                     [self.variables["well_status"]],
                 ),
             ),
@@ -1246,14 +1247,14 @@ class OTT_Pluvio(Instrument):
             Table(
                 "FiveMin", 
                 TableItem(functions.Totalize(1, self.variables["ppt"], "IEEE4", self.variables["pluv_flag"]), ["ppt"]),
-                TableItem(functions.Maximum(1, self.variable["ppt_max_rate"], "IEEE4", False, False), ["ppt_max_rate"]),
-                TableItem(functions.Sample(1, self.variables["pluv_fill"], "IEEE4", False), ["pluv_fill"]),
-                TableItem(functions.Sample(1, self.variables["pluv_heater"], "FP2", False), ["pluv_heater"])
+                TableItem(functions.Maximum(1, self.variables["ppt_max_rate"], "IEEE4", False, False), ["ppt_max_rate"]),
+                TableItem(functions.Sample(1, self.variables["pluv_fill"], "IEEE4"), ["pluv_fill"]),
+                TableItem(functions.Sample(1, self.variables["pluv_heater"], "FP2"), ["pluv_heater"])
             ),
             Table(
                 "StatusReport",
-                TableItem(functions.Sample(1, self.variables["pluv_gagestat"], "FP2", False)),
-                TableItem(functions.Sample(1, self.variables["pluv_temp"], "FP2", False)),
+                TableItem(functions.Sample(1, self.variables["pluv_gagestat"], "FP2")),
+                TableItem(functions.Sample(1, self.variables["pluv_temp"], "FP2")),
                 data_interval=DataInterval(0, 120, "min", 10)
             )
         ]
@@ -1544,7 +1545,6 @@ INSTRUMENTS = {
     "ProStar_EMC1": ProStar_EMC1,
     "CR1000X_Battery": CR1000X_Battery,
     "CR1000X_PanelTemp": CR1000X_PanelTemp,
-    "Generic_IPCamera": Generic_IPCamera,
     "EnviroCams_iPatrol": EnviroCams_iPatrol,
     "EnviroCams_Scout": EnviroCams_Scout,
     "SparkFun_Door_Switch": SparkFun_Door_Switch,

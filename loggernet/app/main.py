@@ -1,20 +1,20 @@
 from fastapi import FastAPI, File, UploadFile, HTTPException, Depends, Query,Path
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
 import subprocess
 from sqlalchemy.orm import Session
 import uuid
 import os
-from app.schemas import ValidInstruments
+from app import schemas
 from app.instruments import INSTRUMENTS, Instrument
-from typing import Annotated
+from typing import Annotated, Any
 
 app = FastAPI()
+app.mount("/static", StaticFiles(directory="/app/app/static"), name="static")
 
-
-@app.get("/")
-async def root():
-    return {"message": "Hello Bigger Applications! Testing!!!!!"}
-
+@app.get("/static")
+async def read_root():
+    return FileResponse(os.path.join("/app/app/static", "index.html"))
 
 @app.post("/compile")
 async def check_compile(file: UploadFile = File(...)):
@@ -55,27 +55,26 @@ async def check_compile(file: UploadFile = File(...)):
 
 
 @app.get("/instruments")
-async def get_instruments():
-    instances = []
+async def get_instruments(q: Annotated[schemas.NamesOnly, Query()]):
+    if q.names_only:
+        return {'instruments': list(INSTRUMENTS.keys())}
+    instances = {}
     for name, instrument in INSTRUMENTS.items():
-        instances.append(instrument(elevation=1, sdi12_address=1))
-        ...
-    # TODO: Make this return a nice json response of each instrument
-    return {"cool": "stuff"}
+        instances[name] = instrument(elevation=1, sdi12_address=1).to_json()
+    return instances
 
 
 @app.get("/instruments/{instrument}")
-async def get_instrument(instrument: Annotated[ValidInstruments, Path]):
-    instance = INSTRUMENTS[instrument](elevation=1, sdi12_address=1)
-    # TODO: Make this return a nice json response of each instrument
-
+async def get_instrument(instrument: Annotated[schemas.ValidInstruments, Path]):
+    instance = INSTRUMENTS[instrument.value](elevation=1, sdi12_address=1).to_json()
     return instance
 
 
-@app.get("/program")
+@app.post("/program")
 async def build_program(
-    instrument: Annotated[list[ValidInstruments], Query(..., help="A list of instruments you would like to build a program for.")]
+    instrument: Annotated[list[schemas.ValidInstruments], Query(..., help="A list of instruments you would like to build a program for.")]
 ):
+    
     #TODO: this
     ...
 
