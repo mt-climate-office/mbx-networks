@@ -225,12 +225,49 @@ class WiringDiagram:
 
 
 @dataclass
+class Dependency:
+    name: str
+    description: str
+    mapped_dep: Variable | None = field(default=None, repr=False)
+
+
+@dataclass(init=False)
+class Dependencies:
+    parent: Instrument = field(repr=False)
+    dependencies: list[Dependency]
+    def __init__(self, parent: Instrument, *dependencies: Dependency):
+        self.parent = parent
+        self.dependencies = dependencies
+
+    def _internal_getitem(self, item: str, return_mapped: bool = True) -> Variable | Dependency:
+        for dep in self.dependencies:
+            if dep.name == item:
+                if return_mapped:
+                    if dep.mapped_dep is None:
+                        raise ValueError(f"A dependency has not been mapped for {self.parent.manufacturer} {self.parent.model} ({self.parent.type})")
+                    return dep.mapped_dep
+                else:
+                    return dep
+        raise ValueError(f"{item} is not a declared dependency.")
+    
+    def __getitem__(self, item: str) -> Variable:
+        self._internal_getitem(item, True)
+    
+    def map_dependency(self, item: str, v: Variable) -> None:
+        item: Dependency = self._internal_getitem(item, False)
+        item.mapped_dep = v
+        
+
+
+@dataclass
 class Instrument(ABC):
     manufacturer: str = field(init=False)
     model: str = field(init=False)
     type: str = field(init=False)
     wires: WiringDiagram = field(init=False, default=None)
     variables: list[Variable] | dict[str, Variable] = field(init=False, default=None)
+    is_sdi12: bool = False
+    dependencies: Dependencies | None = None
     _slow_sequence: SlowSequence | str | None = field(init=False, default="initial")
 
     elevation: int | None = None
@@ -289,13 +326,22 @@ class Instrument(ABC):
             tables = {x.name: x for x in self.tables} 
         except (NotImplementedError, TypeError):
             tables = "No tables defined for this instrument."
-        return {
+        out = {
             "Manufacturer": self.manufacturer,
             "Model": self.model,
             "Type": self.type,
             "Wiring": {x.wire: asdict(x) for x in self.wires.args} if self.wires else "No Wiring",
-            "Tables": tables
+            "Tables": tables,
+            "Variables": self.variables
         }
+
+        if self.dependencies:
+            out["Dependencies"] = self.dependencies.dependencies
+        
+        return out
+    
+    def map_dependency(self, item: str, dep: Variable) -> None:
+        self.dependencies.map_dependency(item, dep)
 
     def __str__(self) -> str:
         table_str = (
@@ -336,10 +382,11 @@ class Instrument(ABC):
 
 
 class RMYoung_05108_77(Instrument):
+    manufacturer = "RM Young"
+    model = "05108-77"
+    type = "Wind"
     def __post_init__(self):
-        self.manufacturer = "RM Young"
-        self.model = "05108-74"
-        self.type = "Wind"
+
         self.wires = WiringDiagram(
             Wire("Red", WireOptions.P1, "WS Signal      WS SIG"),
             Wire("White", WireOptions.VX2, "WD Excite      WD EXC"),
@@ -447,10 +494,10 @@ class RMYoung_05108_77(Instrument):
 
 
 class RMYoung_09106(Instrument):
+    manufacturer = "RM Young"
+    model = "09106"
+    type = "Wind"
     def __post_init__(self):
-        self.manufacturer = "RM Young"
-        self.model = "09106"
-        self.type = "Wind"
 
         self.wires = WiringDiagram(
             Wire("Red", WireOptions._12V, "12v Power"),
@@ -539,10 +586,10 @@ class RMYoung_09106(Instrument):
 
 
 class Setra_CS100(Instrument):
+    manufacturer = "Setra"
+    model = "CS100"
+    type = "Barometer"
     def __post_init__(self):
-        self.manufacturer = "Setra"
-        self.model = "CS100"
-        self.type = "Barometer"
 
         self.wires = WiringDiagram(
             Wire("Blue", WireOptions.SE2, "Signal H"),
@@ -586,10 +633,10 @@ class Setra_CS100(Instrument):
 
 
 class Vaisala_HMP155(Instrument):
+    model = "HMP-155 (RS-485)"
+    manufacturer = "Vaisala"
+    type = "RH/T"
     def __post_init__(self):
-        self.model = "HMP-155 (RS-485)"
-        self.manufacturer = "Vaisala"
-        self.type = "RH/T"
 
         self.wires = WiringDiagram(
             Wire("Brown", WireOptions.COM7, "RS485 B"),
@@ -691,10 +738,10 @@ class Vaisala_HMP155(Instrument):
 
 
 class Acclima_TDR310N(Instrument):
+    model = "Acclima"
+    manufacturer = "TDR-310N"
+    type = "Soil"
     def __post_init__(self):
-        self.model = "Acclima"
-        self.manufacturer = "TDR-310N"
-        self.type = "Soil"
 
         if self.sdi12_address is None:
             raise AttributeError(
@@ -822,10 +869,10 @@ class Acclima_TDR310N(Instrument):
 
 
 class ProStar_EMC1(Instrument):
+    model = "ProStar"
+    manufacturer = "EMC-1"
+    type = "Charge Data"
     def __post_init__(self):
-        self.model = "ProStar"
-        self.manufacturer = "EMC-1"
-        self.type = "Charge Data"
 
         self.variables = [
             Variable("ModbusSocker", VarType.PUBLIC, DataType.FLOAT),
@@ -950,13 +997,11 @@ class ProStar_EMC1(Instrument):
         )
 
 
-# TODO: Implement these as defaults for if no instruments are selected.
 class CR1000X_Battery(Instrument): 
-    
+    manufacturer = "Campbell Scientific"
+    model = "CR1000X"
+    type = "Charge Data"
     def __post_init__(self):
-        self.manufacturer = "Campbell Scientific"
-        self.model = "CR1000X"
-        self.type = "Charge Data"
         self.variables = [
             Variable("batt_volt", VarType.PUBLIC, units="v"),
             Variable("shutoff_voltage", VarType.PUBLIC)
@@ -983,13 +1028,11 @@ class CR1000X_Battery(Instrument):
         return functions.Battery(self.variables["batt_volt"])
 
 
-
 class CR1000X_PanelTemp(Instrument):
+    manufacturer = "Campbell Scientific"
+    model = "CR1000X"
+    type = "Temperature"
     def __post_init__(self):
-        self.manufacturer = "Campbell Scientific"
-        self.model = "CR1000X"
-        self.type = "Temperature"
-
         self.variables = [
             Variable("panel_temp", VarType.PUBLIC, units = "deg C")
         ]
@@ -1001,7 +1044,6 @@ class CR1000X_PanelTemp(Instrument):
         return functions.PanelTemp(self.variables["panel_temp"], "60")
 
 class Generic_IPCamera(Instrument):
-    voltage: CR1000X_Battery | ProStar_EMC1
 
     def __post_init__(self):
         self.wires = WiringDiagram(
@@ -1018,6 +1060,16 @@ class Generic_IPCamera(Instrument):
             Variable("Camera_Power", VarType.PUBLIC, DataType.BOOLEAN),
             Variable("Camera_Power_Manual", VarType.PUBLIC, DataType.BOOLEAN),
         ]
+        self.dependencies = Dependencies(
+            self,
+            Dependency(
+                "batt_volt", "Variable measuring the current battery voltage."
+            ),
+            Dependency(
+                "shutoff_voltage", "A variable storing the voltage at which the camera should shut off for battery savings."
+            )
+        )
+
 
         return super().__post_init__()
 
@@ -1046,9 +1098,9 @@ class Generic_IPCamera(Instrument):
                     ),
                     str(
                         If(
-                            self.voltage.variables["batt_volt"],
+                            self.dependencies["batt_volt"].name,
                             "<",
-                            self.voltage.variables["shutoff_voltage"],
+                            self.dependencies["shutoff_voltage"].name,
                             logic=f"{self.variables['Camera_Power']}=false",
                         )
                     ),
@@ -1063,28 +1115,28 @@ class Generic_IPCamera(Instrument):
 
 
 class EnviroCams_iPatrol(Generic_IPCamera):
+    manufacturer = "EnviroCams"
+    model = "iPatrol PTZ"
+    type = "IP Camera"
     def __post_init__(self):
-        self.manufacturer = "EnviroCams"
-        self.model = "iPatrol PTZ"
-        self.type = "IP Camera"
 
         return super().__post_init__()
 
 
 class EnviroCams_Scout(Generic_IPCamera):
+    manufacturer = "EnviroCams"
+    model = "Scout PTZ"
+    type = "IP Camera"
     def __post_init__(self):
-        self.manufacturer = "EnviroCams"
-        self.model = "Scout PTZ"
-        self.type = "IP Camera"
 
         return super().__post_init__()
 
 
 class SparkFun_Door_Switch(Instrument):
+    manufacturer = "SparkFun"
+    model = "Door Switch"
+    type = "Door"
     def __post_init__(self):
-        self.manufacturer = "SparkFun"
-        self.model = "Door Switch"
-        self.type = "Door"
 
         self.wires = WiringDiagram(
             Wire("Red", WireOptions._5V, "5v Power"),
@@ -1150,10 +1202,10 @@ class SparkFun_Door_Switch(Instrument):
 
 
 class OTT_PLS500(Instrument):
+    manufacturer = "OTT"
+    model = "PLS 500"
+    type = "Pressure Probe"
     def __post_init__(self):
-        self.manufacturer = "OTT"
-        self.model = "PLS 500"
-        self.type = "Pressure Probe"
         assert self.sdi12_address is not None, (
             "An SDI12 Address must be specified for this device."
         )
@@ -1211,10 +1263,10 @@ class OTT_PLS500(Instrument):
 
 
 class OTT_Pluvio(Instrument):
+    manufacturer = "OTT"
+    model = "Pluvio2_L_400"
+    type = "Precipitation"
     def __post_init__(self):
-        self.manufacturer = "OTT"
-        self.model = "Pluvio2_L_400"
-        self.type = "Precipitation"
 
         self.wires = WiringDiagram(
             Wire("Black", None, "DC Converter blac (out) (#1 not used)"),
@@ -1285,12 +1337,11 @@ class OTT_Pluvio(Instrument):
         )
 
 class Sierra_RV50X(Instrument):
-    voltage: CR1000X_Battery | ProStar_EMC1
+    manufacturer = "Sierra Wireless"
+    model = "RV50X"
+    type = "Modem"
 
     def __post_init__(self):
-        self.manufacturer = "Sierra Wireless"
-        self.model = "RV50X"
-        self.type = "Modem"
 
         self.wires = WiringDiagram(
             Wire("Black", WireOptions.G),
@@ -1299,6 +1350,15 @@ class Sierra_RV50X(Instrument):
         )
 
         self.variables = [Variable("Modem_Power", VarType.PUBLIC, DataType.BOOLEAN)]
+        self.dependencies = Dependencies(
+            self,
+            Dependency(
+                "batt_volt", "Variable measuring the current battery voltage."
+            ),
+            Dependency(
+                "shutoff_voltage", "A variable storing the voltage at which the camera should shut off for battery savings."
+            )
+        )
 
         return super().__post_init__()
 
@@ -1315,9 +1375,9 @@ class Sierra_RV50X(Instrument):
                     logic=f"{self.variables['Modem_Power']} = False",
                 ).Else(f"{self.variables['Modem_Power']} = True"),
                 If(
-                    self.voltage.variables["batt_volt"],
+                    self.dependencies["batt_volt"].name,
                     "<",
-                    self.voltage.variables["shutoff_voltage"],
+                    self.dependencies["shutoff_voltage"].name,
                     logic=If(
                         functions.TimeIsBetween(1, 4, 240, "min"),
                         logic=f"{self.variables['Modem_Power']} = True",
@@ -1327,15 +1387,12 @@ class Sierra_RV50X(Instrument):
             ]
         )
 
-
 class Campbell_SnowVue10(Instrument):
-    temperature: Vaisala_HMP155
+    manufacturer = "Campbell Scientific"
+    model = "SnowVue10"
+    type = "Snow"
 
     def __post_init__(self):
-        self.manufacturer = "Campbell Scientific"
-        self.model = "SnowVue10"
-        self.type = "Snow"
-
         self.wires = WiringDiagram(
             Wire("White", WireOptions.C1, "SDI-12 data SDI_ADD: 1"),
             Wire("Brown", WireOptions._12V, "Fuse Block 0.5A fuse power"),
@@ -1364,6 +1421,11 @@ class Campbell_SnowVue10(Instrument):
             Variable("SnowVUE_Meta(7)", VarType.ALIAS, value="ResFreq", units="kHz"),  # Resonate Frequency of Transducer
             Variable("SnowVUE_Meta(8)", VarType.ALIAS, value="Alert", units="unitless"),  # Alert flag if ResFreq is out of tolerance
         ]
+
+        self.dependencies = Dependencies(
+            self,
+            Dependency("air_temp", "Air temperature to correct distance to ground measurement.")
+        )
 
         return super().__post_init__()
     
@@ -1437,7 +1499,7 @@ class Campbell_SnowVue10(Instrument):
                 ])
             ),
             f"{self.variables["SnowVUE_Go"]} = False",
-            f"{self.variables["TCDT"]} = {self.variables["Dist2Targ"]}*{functions.Sqr(f"({self.Vaisala_HMP155.variables["air_temp"]}+273.15)/273.15")}",
+            f"{self.variables["TCDT"]} = {self.variables["Dist2Targ"]}*{functions.Sqr(f"({self.dependencies["air_temp"].name}+273.15)/273.15")}",
             f"{self.variables['snow_depth']} = ({self.variables['Dist2Gnd']} - {self.variables['TCDT']}) * 100",
             If(
                 self.variables['snow_depth'], "<", "0",
@@ -1462,12 +1524,11 @@ class Campbell_SnowVue10(Instrument):
 
 
 class Apogee_SP510(Instrument):
-    pyran_calib: float
+    manufacturer = "Apogee"
+    model = "SP-510 SS"
+    type = "Pyranometer"
 
     def __post_init__(self):
-        self.manufacturer = "Apogee"
-        self.model = "SP-510 SS"
-        self.type = "Pyranometer"
 
         self.wires = WiringDiagram(
             Wire("White", WireOptions.DIFF_2_H, "Signal Positive"),
@@ -1482,6 +1543,13 @@ class Apogee_SP510(Instrument):
             Variable("sol_min", VarType.PUBLIC, units="W m-2"),
             Variable("pyran_calib", VarType.PUBLIC),
         ]
+
+        self.dependencies = Dependencies(
+            self,
+            Dependency(
+                "pyran_calib", "Pyranometer calibration coefficient to correct radiation value."
+            )
+        )
         return super().__post_init__()
 
     @property
@@ -1522,7 +1590,7 @@ class Apogee_SP510(Instrument):
     
     @property
     def pre_scan(self) -> str:
-        return f"{self.variables["pyran_calib"]} = {self.pyran_calib}"
+        return f"{self.variables["pyran_calib"]} = {self.dependencies["pyran_calib"].value}"
 
     @property 
     def program(self) -> str:
@@ -1534,7 +1602,6 @@ class Apogee_SP510(Instrument):
                    f"{self.variables["sol_rad"]} = 0"
                ])
         ])
-
 
 INSTRUMENTS = {
     "RMYoung_05108_77": RMYoung_05108_77,

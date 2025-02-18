@@ -66,8 +66,10 @@ async def get_instruments(q: Annotated[schemas.NamesOnly, Query()]):
 
 @app.get("/instruments/{instrument}")
 async def get_instrument(instrument: Annotated[schemas.ValidInstruments, Path]):
-    instance = INSTRUMENTS[instrument.value](elevation=1, sdi12_address=1).to_json()
-    return instance
+    instance = INSTRUMENTS[instrument.value](elevation=1, sdi12_address=1)
+    
+    out = instance.to_json()
+    return out
 
 
 @app.post("/program")
