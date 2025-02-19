@@ -170,12 +170,20 @@ class Program:
         return s
 
 
-def rename_soil(i: Instrument) -> None:
+def elev_sdi12_rename(i: Instrument, which: Literal["sdi12", "elevation", "both"]) -> None:
+    assert which in ["sdi12", "elevation", "both"], "'which' must be sdi12, elevation, or both."
     pattern = r"\(\d+\)"
     for v in i.variables.values():
         # Only match if it is not an array.
-        if not re.search(pattern, v.name):
-            v.rename_to = f"{v.name}_{i.elevation:04}_id{i.sdi12_address}"
+        if which == "both":
+            if not re.search(pattern, v.name):
+                v.rename_to = f"{v.name}_{i.elevation:04}_id{i.sdi12_address}"
+        elif which == "sdi12":
+            if not re.search(pattern, v.name):
+                v.rename_to = f"{v.name}_id{i.sdi12_address}"
+        else: 
+            if not re.search(pattern, v.name):
+                v.rename_to = f"{v.name}_{i.elevation:04}"
 
 
 def soil_slow_seq_match(p: Program) -> None:
@@ -185,20 +193,21 @@ def soil_slow_seq_match(p: Program) -> None:
         if i.type == "Soil":
             probes.append(i)
 
-    first: Acclima_TDR310N = probes.pop(0)
-    ss_logic = first.slow_sequence.logic
-    for probe in probes:
-        if ss_logic == (new_logic := probe.slow_sequence.logic):
-            ss_logic += new_logic
-        probe.slow_sequence = None
+    if probes:
+        first: Acclima_TDR310N = probes.pop(0)
+        ss_logic = first.slow_sequence.logic
+        for probe in probes:
+            if ss_logic == (new_logic := probe.slow_sequence.logic):
+                ss_logic += new_logic
+            probe.slow_sequence = None
 
 
 my_sensors = [
     Vaisala_HMP155(200),
-    Acclima_TDR310N(5, "1", transform=rename_soil),
-    Acclima_TDR310N(5, "a", transform=rename_soil),
-    Acclima_TDR310N(10, "2", transform=rename_soil),
-    Acclima_TDR310N(10, "b", transform=rename_soil),
+    Acclima_TDR310N(5, "1", transform=lambda x: elev_sdi12_rename(x, 'both')),
+    Acclima_TDR310N(5, "a", transform=lambda x: elev_sdi12_rename(x, 'both')),
+    Acclima_TDR310N(10, "2", transform=lambda x: elev_sdi12_rename(x, 'both')),
+    Acclima_TDR310N(10, "b", transform=lambda x: elev_sdi12_rename(x, 'both')),
     RMYoung_05108_77(1000),
 ]
 
@@ -206,4 +215,3 @@ program = Program(
     "test program", my_sensors, "SequentialMode", True, transform=soil_slow_seq_match
 )
 
-print(program.construct())

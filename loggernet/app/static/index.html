@@ -21,6 +21,8 @@
             padding: 15px;
             border-radius: 4px;
             min-height: 300px;
+            max-height: 80vh;
+            overflow-y: auto;
         }
         .item {
             padding: 8px;
@@ -221,7 +223,6 @@
                 const row = document.createElement('div');
                 row.className = 'attribute-row';
 
-
                 if (key === 'Wiring') {
                     if (value === "No Wiring") {
                         const defaultWiring = {
@@ -285,25 +286,63 @@
                     });
                     
                     row.appendChild(wiringContainer);
-                } else if (key == "Tables") {
-                
-                } else {
-                    const input = document.createElement('input');
-                    const label = document.createElement('span');
-                    label.className = 'attribute-label';
-                    label.textContent = key.charAt(0).toUpperCase() + key.slice(1) + ':';
-                    
-                    input.className = 'attribute-input';
-                    input.value = value;
-                    row.appendChild(input);
-                    input.setAttribute('data-attribute', key);
-                    row.appendChild(label);
-                    row.appendChild(input);
-                }
-
+                }; 
                 attributesPanel.appendChild(row);
             });
-            
+
+            // Add Elevation input
+            const elevationRow = document.createElement('div');
+            elevationRow.className = 'attribute-row';
+            const elevationLabel = document.createElement('span');
+            elevationLabel.className = 'attribute-label';
+            elevationLabel.textContent = 'Elevation (cm):';
+            const elevationInput = document.createElement('input');
+            elevationInput.className = 'attribute-input';
+            elevationInput.setAttribute('data-attribute', 'elevation');
+            elevationRow.appendChild(elevationLabel);
+            elevationRow.appendChild(elevationInput);
+            attributesPanel.appendChild(elevationRow);
+
+            if (instrument['SDI12']) {
+                const sdi12Row = document.createElement('div');
+                sdi12Row.className = 'attribute-row';
+                const sdi12Label = document.createElement('span');
+                sdi12Label.className = 'attribute-label';
+                sdi12Label.textContent = 'SDI12 Address:';
+                const sdi12Input = document.createElement('input');
+                sdi12Input.className = 'attribute-input';
+                sdi12Input.setAttribute('data-attribute', 'sdi12_address');
+                sdi12Row.appendChild(sdi12Label);
+                sdi12Row.appendChild(sdi12Input);
+                attributesPanel.appendChild(sdi12Row);
+            }
+
+
+            // Add Variable Name Inclusion dropdown
+            const varNameRow = document.createElement('div');
+            varNameRow.className = 'attribute-row';
+            const varNameLabel = document.createElement('span');
+            varNameLabel.className = 'attribute-label';
+            varNameLabel.textContent = 'Include in Variable Names:';
+            const varNameSelect = document.createElement('select');
+            varNameSelect.className = 'attribute-input';
+            varNameSelect.setAttribute('data-attribute', 'var_name_inclusion');
+
+            const options = ['None', 'Elevation'];
+            if (instrument.SDI12) {
+                options.push('SDI12', 'Both');
+            }
+            options.forEach(opt => {
+                const option = document.createElement('option');
+                option.value = opt.toLowerCase();
+                option.textContent = opt;
+                varNameSelect.appendChild(option);
+            });
+
+            varNameRow.appendChild(varNameLabel);
+            varNameRow.appendChild(varNameSelect);
+            attributesPanel.appendChild(varNameRow);
+        
             newItem.appendChild(header);
             newItem.appendChild(attributesPanel);
             selectedContainer.appendChild(newItem);
@@ -313,22 +352,30 @@
         async function submitSelection() {
             const selectedItems = Array.from(document.getElementById('selected-items').children)
                 .map(item => {
-                    const name = item.querySelector('span').textContent;
+                    console.log(item);
+                    const name = item.querySelector('.selected-item-header span').textContent;
                     const attributes = {};
-                    const wiring = {}
-                    item.querySelectorAll('.attribute-input').forEach(input => {
-                        if (input.tagName.toLowerCase() === 'select') {
-                            const value = input.options[input.selectedIndex].value
-                            console.log(input);
-                        } else {
-                            const value = input.value
-                        }
-                        const value = input.tagName.toLowerCase() === 'select' ? input.options[input.selectedIndex].value : input.value;
+                    const wiring = {};
+
+                    // Handle regular attributes
+                    item.querySelectorAll('[data-attribute]').forEach(input => {
+                        const value = input.tagName.toLowerCase() === 'select' 
+                            ? input.options[input.selectedIndex].value 
+                            : input.value;
                         attributes[input.getAttribute('data-attribute')] = value;
-                        attributes[input.getAttribute('data-attribute')] = input.value;
                     });
-                    return { name, attributes };
+
+                    // Handle wiring separately
+                    const wiringRows = item.querySelectorAll('.attribute-row div[style*="display: flex"]');
+                    wiringRows.forEach(row => {
+                        const wireLabel = row.querySelector('span').textContent;
+                        const portValue = row.querySelector('select').value;
+                        wiring[wireLabel] = portValue;
+                    });
+
+                    return { name, attributes, wiring };
                 });
+            console.log(selectedItems);
             try {
                 const response = await fetch('/program', {
                     method: 'POST',

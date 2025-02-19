@@ -332,7 +332,8 @@ class Instrument(ABC):
             "Type": self.type,
             "Wiring": {x.wire: asdict(x) for x in self.wires.args} if self.wires else "No Wiring",
             "Tables": tables,
-            "Variables": self.variables
+            "Variables": self.variables,
+            "SDI12": self.is_sdi12
         }
 
         if self.dependencies:
@@ -380,11 +381,11 @@ class Instrument(ABC):
             ]
         )
 
-
+@dataclass
 class RMYoung_05108_77(Instrument):
-    manufacturer = "RM Young"
-    model = "05108-77"
-    type = "Wind"
+    manufacturer: str = "RM Young"
+    model: str = "05108-77"
+    type: str = "Wind"
     def __post_init__(self):
 
         self.wires = WiringDiagram(
@@ -492,11 +493,11 @@ class RMYoung_05108_77(Instrument):
             ]
         )
 
-
+@dataclass
 class RMYoung_09106(Instrument):
-    manufacturer = "RM Young"
-    model = "09106"
-    type = "Wind"
+    manufacturer: str = "RM Young"
+    model: str = "09106"
+    type: str = "Wind"
     def __post_init__(self):
 
         self.wires = WiringDiagram(
@@ -584,11 +585,11 @@ class RMYoung_09106(Instrument):
             ]
         )
 
-
+@dataclass
 class Setra_CS100(Instrument):
-    manufacturer = "Setra"
-    model = "CS100"
-    type = "Barometer"
+    manufacturer: str = "Setra"
+    model: str = "CS100"
+    type: str = "Barometer"
     def __post_init__(self):
 
         self.wires = WiringDiagram(
@@ -631,11 +632,11 @@ class Setra_CS100(Instrument):
             ]
         )
 
-
+@dataclass
 class Vaisala_HMP155(Instrument):
-    model = "HMP-155 (RS-485)"
-    manufacturer = "Vaisala"
-    type = "RH/T"
+    model: str = "HMP-155 (RS-485)"
+    manufacturer: str = "Vaisala"
+    type: str = "RH/T"
     def __post_init__(self):
 
         self.wires = WiringDiagram(
@@ -736,11 +737,12 @@ class Vaisala_HMP155(Instrument):
             ]
         )
 
-
+@dataclass
 class Acclima_TDR310N(Instrument):
-    model = "Acclima"
-    manufacturer = "TDR-310N"
-    type = "Soil"
+    model: str = "Acclima"
+    manufacturer: str = "TDR-310N"
+    type: str = "Soil"
+    is_sdi12: bool = True
     def __post_init__(self):
 
         if self.sdi12_address is None:
@@ -867,11 +869,11 @@ class Acclima_TDR310N(Instrument):
     def slow_sequence(self, value: SlowSequence | None):
         self._slow_sequence = value
 
-
+@dataclass
 class ProStar_EMC1(Instrument):
-    model = "ProStar"
-    manufacturer = "EMC-1"
-    type = "Charge Data"
+    model: str = "ProStar"
+    manufacturer: str = "EMC-1"
+    type: str = "Charge Data"
     def __post_init__(self):
 
         self.variables = [
@@ -996,11 +998,11 @@ class ProStar_EMC1(Instrument):
             ),
         )
 
-
+@dataclass
 class CR1000X_Battery(Instrument): 
-    manufacturer = "Campbell Scientific"
-    model = "CR1000X"
-    type = "Charge Data"
+    manufacturer: str = "Campbell Scientific"
+    model: str = "CR1000X"
+    type: str = "Charge Data"
     def __post_init__(self):
         self.variables = [
             Variable("batt_volt", VarType.PUBLIC, units="v"),
@@ -1027,11 +1029,12 @@ class CR1000X_Battery(Instrument):
     def program(self):
         return functions.Battery(self.variables["batt_volt"])
 
-
+@dataclass
 class CR1000X_PanelTemp(Instrument):
-    manufacturer = "Campbell Scientific"
-    model = "CR1000X"
-    type = "Temperature"
+
+    manufacturer: str = "Campbell Scientific"
+    model: str = "CR1000X"
+    type: str = "Temperature"
     def __post_init__(self):
         self.variables = [
             Variable("panel_temp", VarType.PUBLIC, units = "deg C")
@@ -1043,6 +1046,7 @@ class CR1000X_PanelTemp(Instrument):
     def program(self):
         return functions.PanelTemp(self.variables["panel_temp"], "60")
 
+@dataclass
 class Generic_IPCamera(Instrument):
 
     def __post_init__(self):
@@ -1113,29 +1117,30 @@ class Generic_IPCamera(Instrument):
             )
         )
 
-
+@dataclass
 class EnviroCams_iPatrol(Generic_IPCamera):
-    manufacturer = "EnviroCams"
-    model = "iPatrol PTZ"
-    type = "IP Camera"
+    manufacturer: str = "EnviroCams"
+    model: str = "iPatrol PTZ"
+    type: str = "IP Camera"
     def __post_init__(self):
 
         return super().__post_init__()
 
-
+@dataclass
 class EnviroCams_Scout(Generic_IPCamera):
-    manufacturer = "EnviroCams"
-    model = "Scout PTZ"
-    type = "IP Camera"
+    manufacturer: str = "EnviroCams"
+    model: str = "Scout PTZ"
+    type: str = "IP Camera"
     def __post_init__(self):
 
         return super().__post_init__()
 
-
+@dataclass
 class SparkFun_Door_Switch(Instrument):
-    manufacturer = "SparkFun"
-    model = "Door Switch"
-    type = "Door"
+    manufacturer: str = "SparkFun"
+    model: str = "Door Switch"
+    type: str = "Door"
+
     def __post_init__(self):
 
         self.wires = WiringDiagram(
@@ -1200,11 +1205,12 @@ class SparkFun_Door_Switch(Instrument):
             ]
         )
 
-
+@dataclass
 class OTT_PLS500(Instrument):
-    manufacturer = "OTT"
-    model = "PLS 500"
-    type = "Pressure Probe"
+    manufacturer: str = "OTT"
+    model: str = "PLS 500"
+    type: str = "Pressure Probe"
+    is_sdi12: bool = True
     def __post_init__(self):
         assert self.sdi12_address is not None, (
             "An SDI12 Address must be specified for this device."
@@ -1222,7 +1228,7 @@ class OTT_PLS500(Instrument):
             Variable("Transducer(2)", VarType.ALIAS, value="well_tmp", units="deg C"),
             Variable("Transducer(3)", VarType.ALIAS, value="well_status"),
         ]
-        return super().__post_init__()
+        super().__post_init__()
 
     @property
     def tables(self) -> list[Table]:
@@ -1261,11 +1267,13 @@ class OTT_PLS500(Instrument):
             ),
         )
 
-
+@dataclass
 class OTT_Pluvio(Instrument):
-    manufacturer = "OTT"
-    model = "Pluvio2_L_400"
-    type = "Precipitation"
+    manufacturer: str = "OTT"
+    model: str = "Pluvio2_L_400"
+    type: str = "Precipitation"
+    is_sdi12: bool = True
+
     def __post_init__(self):
 
         self.wires = WiringDiagram(
@@ -1336,6 +1344,7 @@ class OTT_Pluvio(Instrument):
             ])
         )
 
+@dataclass
 class Sierra_RV50X(Instrument):
     manufacturer = "Sierra Wireless"
     model = "RV50X"
@@ -1387,11 +1396,12 @@ class Sierra_RV50X(Instrument):
             ]
         )
 
+@dataclass
 class Campbell_SnowVue10(Instrument):
-    manufacturer = "Campbell Scientific"
-    model = "SnowVue10"
-    type = "Snow"
-
+    manufacturer: str = "Campbell Scientific"
+    model: str = "SnowVue10"
+    type: str = "Snow"
+    is_sdi12: bool = True
     def __post_init__(self):
         self.wires = WiringDiagram(
             Wire("White", WireOptions.C1, "SDI-12 data SDI_ADD: 1"),
@@ -1522,11 +1532,11 @@ class Campbell_SnowVue10(Instrument):
 ])
         )
 
-
+@dataclass
 class Apogee_SP510(Instrument):
-    manufacturer = "Apogee"
-    model = "SP-510 SS"
-    type = "Pyranometer"
+    manufacturer: str = "Apogee"
+    model: str = "SP-510 SS"
+    type: str = "Pyranometer"
 
     def __post_init__(self):
 
