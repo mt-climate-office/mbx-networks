@@ -109,10 +109,11 @@ class Program:
         s += "\n".join(
             f"'{x.type}: {x.manufacturer} {x.model}" for x in self.instruments
         )
-        s += "\n\nWiring Diagram\n"
+        s += "\n\n'Wiring Diagram\n"
         for i in self.instruments:
-            s += f"####{i.model} Wiring####\n"
-            s += str(i.wires) + "\n\n"
+            if i.wires is not None:
+                s += f"'####{i.model} Wiring####\n"
+                s += str(i.wires) + "\n\n"
 
         for i in self.instruments:
             for v in i.variables.values():
@@ -121,6 +122,8 @@ class Program:
         s += "\n"
         if self.preserve_variables:
             s += "PreserveVariables\n"
+
+        s += f"{self.mode}\n"
 
         for table in self.tables:
             s += str(table) + "\n\n"
@@ -144,16 +147,14 @@ class Program:
         for i in self.instruments:
             try:
                 if pr := i.program:
-                    s += indent(pr, "    ")
+                    s += indent(pr, "        ")
                     s += "\n\n"
             except NotImplementedError:
                 continue
 
-        s += "\n    NextScan\n\n"
-
         calltable = "\n".join([f"CallTable {x.name}" for x in self.tables])
 
-        s += indent(calltable, "    ")
+        s += indent(calltable, "        ")
         s += "\n\n"
 
         for i in self.instruments:

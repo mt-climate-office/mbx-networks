@@ -144,6 +144,7 @@
             </div>
         </div>
         <button class="submit-btn" onclick="submitSelection()">Create Program</button>
+        <button class="submit-btn" id="check-compile" style="margin-left: 10px; background-color: #6c757d; cursor: not-allowed;" onclick="checkCompile()" disabled>Check Compile</button>
         <div id="result"></div>
     </div>
 
@@ -438,7 +439,7 @@
             elevationLabel.className = 'attribute-label';
             elevationLabel.textContent = 'Elevation (cm):';
             const elevationInput = document.createElement('input');
-            elevationInput.placeholder = 'None';
+            elevationInput.placeholder = '100';
             elevationInput.type = 'number';
             elevationInput.min = '0';
             elevationInput.className = 'attribute-input';
@@ -496,6 +497,42 @@
             toggleAttributes(toggleButton);
         }
 
+        async function checkCompile() {
+            let lastDownloadedBlob = null;
+            if (!lastDownloadedBlob) {
+                const resultDiv = document.getElementById('result');
+                resultDiv.textContent = 'No program file available. Please create a program first.';
+                resultDiv.className = 'error';
+                return;
+            }
+
+            // Create FormData and append the file
+            const formData = new FormData();
+            formData.append('file', lastDownloadedBlob, 'program.CR1X');
+
+            try {
+                const response = await fetch('/compile', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+                const resultDiv = document.getElementById('result');
+                
+                if (response.ok) {
+                    resultDiv.textContent = 'Program compiled successfully!';
+                    resultDiv.className = 'success';
+                } else {
+                    resultDiv.textContent = result.detail || 'Compilation failed';
+                    resultDiv.className = 'error';
+                }
+            } catch (error) {
+                const resultDiv = document.getElementById('result');
+                resultDiv.textContent = 'Error checking compilation: ' + error.message;
+                resultDiv.className = 'error';
+            }
+        }
+
         async function submitSelection() {
             const selectedItems = Array.from(document.getElementById('selected-items').children)
                 .map(item => {
@@ -538,7 +575,6 @@
                     return { name, elevation, sdi12_address, var_name_inclusion, wiring, dependencies };
                 });
             
-            console.log(selectedItems);
             try {
                 const response = await fetch('/program', {
                     method: 'POST',
@@ -548,13 +584,32 @@
                     body: JSON.stringify(selectedItems)
                 });
 
-                const result = await response.json();
-                const resultDiv = document.getElementById('result');
-                
                 if (response.ok) {
-                    resultDiv.textContent = `Program created successfully! Program ID: ${result.program.programId}`;
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    
+                    const contentDisposition = response.headers.get('Content-Disposition');
+                    const filenameMatch = contentDisposition ? contentDisposition.match(/filename=(.+)/) : null;
+                    a.download = filenameMatch ? filenameMatch[1] : 'program.CR1X';
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    window.URL.revokeObjectURL(url);
+
+                    const resultDiv = document.getElementById('result');
+                    resultDiv.textContent = 'Program created and downloaded successfully!';
                     resultDiv.className = 'success';
+
+                    // Enable the "Check Compile" button after successful program creation
+                    const checkCompileBtn = document.getElementById('check-compile');
+                    console.log(checkCompileBtn)
+                    checkCompileBtn.disabled = false;
+                    checkCompileBtn.style.cursor = 'pointer';
+                    checkCompileBtn.style.backgroundColor = '#007bff';
                 } else {
+                    const result = await response.json();
                     throw new Error(result.detail || 'Error creating program');
                 }
             } catch (error) {

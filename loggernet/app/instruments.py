@@ -76,7 +76,7 @@ class Table:
         self.card_out = card_out
 
     def __str__(self):
-        s = f"DataTable({self.name},{self.trig_var})\n"
+        s = f"DataTable({self.name},{self.trig_var},{self.size})\n"
         s += f"    {str(self.data_interval)}\n"
         if self.card_out:
             s += f"    {str(self.card_out)}\n"
@@ -1094,18 +1094,18 @@ class Generic_IPCamera(Instrument):
         "\n".join(
             [
                 f"{self.variables['Camera_Power']}=true",
-                f"{self.variables['Camera_Power_Manual']}=true",
+                f"{self.variables['Camera_Power_Manual']}=tr`ue",
             ]
         )
 
     @property
     def program(self):
-        "\n".join(
-            If(
+        return "\n".join([
+            str(If(
                 self.variables["Camera_Power_Manual"],
                 logic=functions.SW12(self.wires["Red"], self.variables["Camera_Power"]),
             ).Else(
-                "\n".join(
+                "\n".join([
                     str(
                         If(
                             functions.TimeIsBetween(2, 3, 1400, "min"),
@@ -1125,9 +1125,9 @@ class Generic_IPCamera(Instrument):
                             self.wires["Red"], self.variables["Camera_Power"]
                         )
                     ),
-                )
-            )
-        )
+                ])
+            ))
+        ])
 
 @dataclass
 class EnviroCams_iPatrol(Generic_IPCamera):
@@ -1402,10 +1402,10 @@ class Sierra_RV50X(Instrument):
                     self.dependencies["batt_volt"].name,
                     "<",
                     self.dependencies["shutoff_voltage"].name,
-                    logic=If(
+                    logic=str(If(
                         functions.TimeIsBetween(1, 4, 240, "min"),
                         logic=f"{self.variables['Modem_Power']} = True",
-                    ).Else(f"{self.variables['Modem_Power']} = False"),
+                    ).Else(f"{self.variables['Modem_Power']} = False")),
                 )),
                 functions.SW12(self.wires["White"], self.variables["Modem_Power"]),
             ]

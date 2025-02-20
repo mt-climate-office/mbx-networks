@@ -10401,7 +10401,7 @@ def SW12(
 
     """
     if Option is None:
-        return f"SW12({SW12Chan},{State},{Option})"
+        return f"SW12({SW12Chan},{State})"
     return f"SW12({SW12Chan},{State},{Option})"
 
 

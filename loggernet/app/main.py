@@ -1,10 +1,11 @@
 from fastapi import FastAPI, File, UploadFile, HTTPException, Depends, Query,Path, Body
-from fastapi.responses import JSONResponse, FileResponse
+from fastapi.responses import JSONResponse, FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 import subprocess
 from sqlalchemy.orm import Session
 import uuid
 import os
+import io
 from app import schemas
 from app.instruments import INSTRUMENTS, Instrument
 from app.program import Program, elev_sdi12_rename, soil_slow_seq_match
@@ -14,9 +15,9 @@ from typing import Annotated, Any
 app = FastAPI()
 app.mount("/static", StaticFiles(directory="/app/app/static"), name="static")
 
-@app.get("/static")
-async def read_root():
-    return FileResponse(os.path.join("/app/app/static", "index.html"))
+# @app.get("/test")
+# async def read_root():
+#     return FileResponse("/app/app/static/index.html")
 
 @app.post("/compile")
 async def check_compile(file: UploadFile = File(...)):
@@ -128,15 +129,23 @@ async def build_program(
             the_dep = target.variables[meta['variable']]
             program_instrument.dependencies.map_dependency(meta['variable'], the_dep)
     
+    filename = f"CSI_LoggerNet_{str(dt.date.today()).replace("-", "")}.CR1X"
     program = Program(
-        f"CSI_LoggerNet_{str(dt.date.today()).replace("-", "")}.CR1X",
+        filename,
         instruments = program_instruments,
         mode="SequentialMode",
     )
 
-    out = program.construct()
-    # TODO: Fix If logic to str here.
-    ...
+    stream = io.StringIO(program.construct())
+    return StreamingResponse(
+        stream,
+        media_type="text/plain",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
+
+@app.get("/program/build")
+async def program_builder_form():
+    return FileResponse("/app/app/static/index.html")
 
 
 @app.get("/program/{station}")
@@ -144,10 +153,4 @@ async def build_program_from_station(
     station: str
 ):
     #TODO: This
-    ...
-
-
-@app.get("/program/build")
-async def program_builder_form():
-    # TODO: simple html form that hist the "/program" endpoint
     ...
