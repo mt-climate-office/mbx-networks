@@ -2,12 +2,10 @@ from dataclasses import dataclass, field
 from datetime import date
 import re
 
-from instruments import (
+from app.instruments import (
     Instrument,
     Table,
-    Vaisala_HMP155,
     Acclima_TDR310N,
-    RMYoung_05108_77,
     Scan,
     SlowSequence,
 )
@@ -21,7 +19,6 @@ class Program:
     instruments: list[Instrument]
     mode: Literal["SequentialMode", "PipelineMode"] = "SequentialMode"
     preserve_variables: bool = True
-    include_batt: bool = False
     scan: Scan = field(default_factory=lambda: Scan(3, "Sec", 1, 0))
     tables: list[Table] = field(init=False)
     functions: list[str] = field(init=False)
@@ -55,12 +52,18 @@ class Program:
 
     # TODO: Implement logic to make sure if an instruemnt has a dependency,
     # that the dependency indeed exists.
-    def __validate_dependencies(self): ...
+    def __validate_dependencies(self): 
+        ...
 
     def __find_tables(self):
         tables = {}
         for instrument in self.instruments:
-            for table in instrument.tables:
+            try: 
+                tabs = instrument.tables
+            except NotImplementedError:
+                continue
+
+            for table in tabs:
                 if table.name in tables and tables[table.name] != table:
                     raise AttributeError(
                         f"More than one table named {table.name} exist, but have settings that don't match. Make sure that all tables named {table.name} share the same settings."
@@ -100,7 +103,7 @@ class Program:
                 else:
                     keys.append(val)
 
-    def construct(self):
+    def construct(self) -> str:
         s = f"'{self.name}\n'Program Created on: {date.today()}\n\n"
         s += "'SYSTEM CONFIGURATION\n"
         s += "\n".join(
@@ -200,18 +203,4 @@ def soil_slow_seq_match(p: Program) -> None:
             if ss_logic == (new_logic := probe.slow_sequence.logic):
                 ss_logic += new_logic
             probe.slow_sequence = None
-
-
-my_sensors = [
-    Vaisala_HMP155(200),
-    Acclima_TDR310N(5, "1", transform=lambda x: elev_sdi12_rename(x, 'both')),
-    Acclima_TDR310N(5, "a", transform=lambda x: elev_sdi12_rename(x, 'both')),
-    Acclima_TDR310N(10, "2", transform=lambda x: elev_sdi12_rename(x, 'both')),
-    Acclima_TDR310N(10, "b", transform=lambda x: elev_sdi12_rename(x, 'both')),
-    RMYoung_05108_77(1000),
-]
-
-program = Program(
-    "test program", my_sensors, "SequentialMode", True, transform=soil_slow_seq_match
-)
 

@@ -67,7 +67,6 @@
             padding: 2px 6px;
             cursor: pointer;
             font-size: 12px;
-            margin-left: 8px;
         }
         .toggle-btn:hover {
             background: #45a049;
@@ -162,7 +161,25 @@
                     const div = document.createElement('div');
                     div.className = 'item';
                     div.textContent = `${instrument.Manufacturer} ${instrument.Model} (${instrument.Type})`;
-                    div.onclick = () => addItem(instrument);
+                    div.setAttribute('data-instrument-id', instrument.ID);
+                    div.onclick = () => {
+                        if (!window.selectedInstrumentVariables) {
+                            window.selectedInstrumentVariables = [];
+                        }
+                        
+                        // Add each variable from the instrument to the tracking array
+                        if (instrument.Variables) {
+                            Object.keys(instrument.Variables).forEach(variable => {
+                                if (!variable.includes('(') && !variable.includes(')')) {
+                                    window.selectedInstrumentVariables.push({
+                                        "_id": instrument.ID,
+                                        "variable": variable
+                                    });
+                                };
+                            });
+                        }
+                        addItem(instrument);
+                    };
                     container.appendChild(div);
                 });
             } catch (error) {
@@ -191,8 +208,13 @@
             
             const textSpan = document.createElement('span');
             textSpan.textContent = `${instrument.Manufacturer} ${instrument.Model} (${instrument.Type})`;
-            
+            const subtitleSpan = document.createElement('div');
+            subtitleSpan.textContent = `Instrument ID: ${instrument.ID}`;
+            subtitleSpan.style.fontSize = '12px';
+            subtitleSpan.style.color = '#666';
+            textSpan.appendChild(subtitleSpan);
             const buttonContainer = document.createElement('div');
+            buttonContainer.style.marginTop = '8px';
             
             const toggleButton = document.createElement('button');
             toggleButton.className = 'toggle-btn';
@@ -208,10 +230,60 @@
             removeButton.onclick = (e) => {
                 e.stopPropagation();
                 newItem.remove();
+                // When we remove the item, find its variables and remove them from selectedInstrumentVariables
+                const text = textSpan.textContent;
+                const itemsToRemove = window.selectedInstrumentVariables.filter(item => 
+                    Object.keys(instrument.Variables).some(v => 
+                        !v.includes('(') && !v.includes(')') && 
+                        item.variable === v && 
+                        item._id === instrument.ID
+                    )
+                );
+                
+                itemsToRemove.forEach(item => {
+                    const index = window.selectedInstrumentVariables.findIndex(v => 
+                        v.variable === item.variable && v._id === item._id
+                    );
+                    if (index > -1) {
+                        window.selectedInstrumentVariables.splice(index, 1);
+                    }
+                });
+                // Update all dependency selects with remaining variables
+                if (window.dependencySelects) {
+                    window.dependencySelects.forEach(select => {
+                        const selectedValue = select.value;
+                        select.innerHTML = '';
+
+                        const defaultOption = document.createElement('option');
+                        defaultOption.value = '';
+                        defaultOption.textContent = 'Select a variable';
+                        select.appendChild(defaultOption);
+
+                        // Add options only for remaining variables
+                        window.selectedInstrumentVariables.forEach(v => {
+                            const option = document.createElement('option');
+                            option.value = JSON.stringify(v);
+                            option.textContent = v.variable;
+                            if (selectedValue === option.value) {
+                                option.selected = true;
+                            }
+                            select.appendChild(option);
+                        });
+
+                        // Reset to default if selected value was from removed instrument
+                        if (select.selectedIndex === -1) {
+                            select.value = '';
+                        }
+                    });
+                }
+                newItem.remove();
             };
             
             buttonContainer.appendChild(toggleButton);
             buttonContainer.appendChild(removeButton);
+            
+            header.style.flexDirection = 'column';
+            header.style.alignItems = 'flex-start';
             header.appendChild(textSpan);
             header.appendChild(buttonContainer);
             
@@ -233,7 +305,6 @@
                     }
                     // Create a container for wiring inputs
                     const wiringContainer = document.createElement('div');
-                    wiringContainer.style.marginTop = '8px';
                     Object.entries(value).forEach(([color, locs]) => {
                         const wireRow = document.createElement('div');
                         // Add header for Wiring Configuration
@@ -249,7 +320,7 @@
                         wireRow.style.marginBottom = '4px';
                         
                         const wireLabel = document.createElement('span');
-                        wireLabel.textContent = locs.wire;
+                        wireLabel.textContent = locs.wire + ":";
                         wireLabel.style.minWidth = '60px';
                         
                         const portInput = document.createElement('select');
@@ -286,17 +357,90 @@
                     });
                     
                     row.appendChild(wiringContainer);
-                }; 
+                } else if (key === "Dependencies") {
+                    if (value) {
+                        const depContainer = document.createElement('div');
+                        const depHeader = document.createElement('div');
+                        depHeader.textContent = 'Dependencies';
+                        depHeader.style.fontWeight = 'bold';
+                        depHeader.style.marginBottom = '8px';
+                        depContainer.appendChild(depHeader);
+
+                        value.forEach(dep => {
+                            const depRow = document.createElement('div');
+                            depRow.style.marginBottom = '12px';
+
+                            const labelDiv = document.createElement('div');
+                            const nameSpan = document.createElement('div');
+                            nameSpan.textContent = dep.name;
+                            const descSpan = document.createElement('div');
+                            descSpan.textContent = dep.description;
+                            descSpan.style.fontSize = '12px';
+                            descSpan.style.color = '#666';
+
+                            const select = document.createElement('select');
+                            select.className = 'attribute-input';
+                            select.style.marginBottom = '4px';
+
+                            const updateSelect = (selectElement) => {
+                                selectElement.innerHTML = ''; // Clear existing options
+                                const defaultOption = document.createElement('option');
+                                defaultOption.value = '';
+                                defaultOption.textContent = 'Select a variable';
+                                selectElement.appendChild(defaultOption);
+
+                                window.selectedInstrumentVariables.forEach(v => {
+                                    const option = document.createElement('option');
+                                    option.value = JSON.stringify(v);
+                                    option.textContent = v.variable;
+                                    selectElement.appendChild(option);
+                                });
+                            };
+
+                            updateSelect(select);
+
+                            // Store reference to update this select
+                            if (!window.dependencySelects) {
+                                window.dependencySelects = [];
+                            }
+
+                            window.dependencySelects.push(select);
+
+                            // Update all selects
+                            window.dependencySelects.forEach(s => updateSelect(s));
+                            window.dependencySelects.push(select);
+
+                            labelDiv.appendChild(nameSpan);
+                            labelDiv.appendChild(descSpan);
+                            depRow.appendChild(select);
+                            depRow.appendChild(labelDiv);
+                            depContainer.appendChild(depRow);
+                        });
+
+                        row.appendChild(depContainer);
+                    }
+                }
+                
                 attributesPanel.appendChild(row);
             });
 
             // Add Elevation input
+            // Add Metadata Header
+            const metadataHeader = document.createElement('div');
+            metadataHeader.textContent = 'Sensor Metadata';
+            metadataHeader.style.fontWeight = 'bold';
+            metadataHeader.style.marginBottom = '8px';
+            attributesPanel.appendChild(metadataHeader);
+
             const elevationRow = document.createElement('div');
             elevationRow.className = 'attribute-row';
             const elevationLabel = document.createElement('span');
             elevationLabel.className = 'attribute-label';
             elevationLabel.textContent = 'Elevation (cm):';
             const elevationInput = document.createElement('input');
+            elevationInput.placeholder = 'None';
+            elevationInput.type = 'number';
+            elevationInput.min = '0';
             elevationInput.className = 'attribute-input';
             elevationInput.setAttribute('data-attribute', 'elevation');
             elevationRow.appendChild(elevationLabel);
@@ -310,6 +454,9 @@
                 sdi12Label.className = 'attribute-label';
                 sdi12Label.textContent = 'SDI12 Address:';
                 const sdi12Input = document.createElement('input');
+                sdi12Input.placeholder = 1;
+                sdi12Input.value = 1;
+                sdi12Input.maxLength = 1;
                 sdi12Input.className = 'attribute-input';
                 sdi12Input.setAttribute('data-attribute', 'sdi12_address');
                 sdi12Row.appendChild(sdi12Label);
@@ -352,29 +499,45 @@
         async function submitSelection() {
             const selectedItems = Array.from(document.getElementById('selected-items').children)
                 .map(item => {
-                    console.log(item);
-                    const name = item.querySelector('.selected-item-header span').textContent;
-                    const attributes = {};
+                    const name = item.querySelector('.selected-item-header div[style*="font-size: 12px"]').textContent.replace('Instrument ID: ', '');
                     const wiring = {};
+                    const elevation = item.querySelector('[data-attribute="elevation"]')?.value || null;
+                    const sdi12_address = item.querySelector('[data-attribute="sdi12_address"]')?.value || null;
+                    const var_name_inclusion = item.querySelector('[data-attribute="var_name_inclusion"]')?.value || 'none';
 
-                    // Handle regular attributes
-                    item.querySelectorAll('[data-attribute]').forEach(input => {
-                        const value = input.tagName.toLowerCase() === 'select' 
-                            ? input.options[input.selectedIndex].value 
-                            : input.value;
-                        attributes[input.getAttribute('data-attribute')] = value;
-                    });
 
                     // Handle wiring separately
                     const wiringRows = item.querySelectorAll('.attribute-row div[style*="display: flex"]');
                     wiringRows.forEach(row => {
-                        const wireLabel = row.querySelector('span').textContent;
-                        const portValue = row.querySelector('select').value;
+                        const wireLabel = row.querySelector('span').textContent.slice(0, -1);
+                        let portValue = row.querySelector('select').value;
+                        portValue = portValue === "" ? null : portValue;
                         wiring[wireLabel] = portValue;
                     });
 
-                    return { name, attributes, wiring };
+                    // Handle dependencies
+                    let dependencies = null;
+                    const dependencySelects = item.querySelectorAll('.attribute-row select:not([data-attribute])');
+                    if (dependencySelects.length > 0) {
+                        dependencies = {};
+                        dependencySelects.forEach((select) => {
+                            if (select.value) {
+                                try {
+                                    const depValue = JSON.parse(select.value);
+                                    dependencies[depValue.variable] = depValue;
+                                } catch (e) {
+                                    //console.error("Failed to parse dependency value:", select.value, e);
+                                }
+                            }
+                        });
+                        if (Object.keys(dependencies).length === 0 || Object.keys(dependencies).includes('undefined')) {
+                            dependencies = null;
+                        }
+                    }
+                    console.log(dependencies);
+                    return { name, elevation, sdi12_address, var_name_inclusion, wiring, dependencies };
                 });
+            
             console.log(selectedItems);
             try {
                 const response = await fetch('/program', {
@@ -382,7 +545,7 @@
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify({ selectedItems })
+                    body: JSON.stringify(selectedItems)
                 });
 
                 const result = await response.json();

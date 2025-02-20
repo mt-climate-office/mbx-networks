@@ -251,7 +251,7 @@ class Dependencies:
         raise ValueError(f"{item} is not a declared dependency.")
     
     def __getitem__(self, item: str) -> Variable:
-        self._internal_getitem(item, True)
+        return self._internal_getitem(item, True)
     
     def map_dependency(self, item: str, v: Variable) -> None:
         item: Dependency = self._internal_getitem(item, False)
@@ -264,6 +264,7 @@ class Instrument(ABC):
     manufacturer: str = field(init=False)
     model: str = field(init=False)
     type: str = field(init=False)
+    _id: str = field(init=False)
     wires: WiringDiagram = field(init=False, default=None)
     variables: list[Variable] | dict[str, Variable] = field(init=False, default=None)
     is_sdi12: bool = False
@@ -280,6 +281,8 @@ class Instrument(ABC):
         if self.transform is not None:
             self._transform()
         self.check_unique_names()
+        if self.is_sdi12 and not self.sdi12_address:
+            raise ValueError("This is an SDI12 device and an SDI12 address isn't specified.")
 
     def _transform(self):
         self.transform(self)
@@ -327,6 +330,7 @@ class Instrument(ABC):
         except (NotImplementedError, TypeError):
             tables = "No tables defined for this instrument."
         out = {
+            "ID": self._id,
             "Manufacturer": self.manufacturer,
             "Model": self.model,
             "Type": self.type,
@@ -386,6 +390,7 @@ class RMYoung_05108_77(Instrument):
     manufacturer: str = "RM Young"
     model: str = "05108-77"
     type: str = "Wind"
+    _id: str = "rmyoung_05108_77"
     def __post_init__(self):
 
         self.wires = WiringDiagram(
@@ -498,6 +503,7 @@ class RMYoung_09106(Instrument):
     manufacturer: str = "RM Young"
     model: str = "09106"
     type: str = "Wind"
+    _id: str = "rmyoung_09106"
     def __post_init__(self):
 
         self.wires = WiringDiagram(
@@ -590,6 +596,7 @@ class Setra_CS100(Instrument):
     manufacturer: str = "Setra"
     model: str = "CS100"
     type: str = "Barometer"
+    _id: str = "setra_cs100"
     def __post_init__(self):
 
         self.wires = WiringDiagram(
@@ -637,6 +644,7 @@ class Vaisala_HMP155(Instrument):
     model: str = "HMP-155 (RS-485)"
     manufacturer: str = "Vaisala"
     type: str = "RH/T"
+    _id: str = "vaisala_hmp155"
     def __post_init__(self):
 
         self.wires = WiringDiagram(
@@ -742,6 +750,7 @@ class Acclima_TDR310N(Instrument):
     model: str = "Acclima"
     manufacturer: str = "TDR-310N"
     type: str = "Soil"
+    _id: str = "acclima_tdr310n"
     is_sdi12: bool = True
     def __post_init__(self):
 
@@ -874,6 +883,7 @@ class ProStar_EMC1(Instrument):
     model: str = "ProStar"
     manufacturer: str = "EMC-1"
     type: str = "Charge Data"
+    _id: str = "prostar_emc1"
     def __post_init__(self):
 
         self.variables = [
@@ -1003,6 +1013,7 @@ class CR1000X_Battery(Instrument):
     manufacturer: str = "Campbell Scientific"
     model: str = "CR1000X"
     type: str = "Charge Data"
+    _id: str = "cr1000x_charge"
     def __post_init__(self):
         self.variables = [
             Variable("batt_volt", VarType.PUBLIC, units="v"),
@@ -1013,7 +1024,7 @@ class CR1000X_Battery(Instrument):
 
     @property
     def tables(self) -> list[Table]:
-        [Table(
+        return [Table(
             "FiveMin",
             TableItem(
                 functions.Sample(1, self.variables["batt_volt"], "FP2"), 
@@ -1035,6 +1046,7 @@ class CR1000X_PanelTemp(Instrument):
     manufacturer: str = "Campbell Scientific"
     model: str = "CR1000X"
     type: str = "Temperature"
+    _id: str = "cr1000x_temp"
     def __post_init__(self):
         self.variables = [
             Variable("panel_temp", VarType.PUBLIC, units = "deg C")
@@ -1122,6 +1134,7 @@ class EnviroCams_iPatrol(Generic_IPCamera):
     manufacturer: str = "EnviroCams"
     model: str = "iPatrol PTZ"
     type: str = "IP Camera"
+    _id: str = "envirocams_ipatrol"
     def __post_init__(self):
 
         return super().__post_init__()
@@ -1131,6 +1144,7 @@ class EnviroCams_Scout(Generic_IPCamera):
     manufacturer: str = "EnviroCams"
     model: str = "Scout PTZ"
     type: str = "IP Camera"
+    _id: str = "envirocams_scout"
     def __post_init__(self):
 
         return super().__post_init__()
@@ -1140,7 +1154,7 @@ class SparkFun_Door_Switch(Instrument):
     manufacturer: str = "SparkFun"
     model: str = "Door Switch"
     type: str = "Door"
-
+    _id: str = "sparkfun_door"
     def __post_init__(self):
 
         self.wires = WiringDiagram(
@@ -1210,6 +1224,7 @@ class OTT_PLS500(Instrument):
     manufacturer: str = "OTT"
     model: str = "PLS 500"
     type: str = "Pressure Probe"
+    _id: str = "ott_pls500"
     is_sdi12: bool = True
     def __post_init__(self):
         assert self.sdi12_address is not None, (
@@ -1273,7 +1288,7 @@ class OTT_Pluvio(Instrument):
     model: str = "Pluvio2_L_400"
     type: str = "Precipitation"
     is_sdi12: bool = True
-
+    _id: str = "ott_pluvio"
     def __post_init__(self):
 
         self.wires = WiringDiagram(
@@ -1349,7 +1364,7 @@ class Sierra_RV50X(Instrument):
     manufacturer = "Sierra Wireless"
     model = "RV50X"
     type = "Modem"
-
+    _id = "sierra_rv50x"
     def __post_init__(self):
 
         self.wires = WiringDiagram(
@@ -1379,11 +1394,11 @@ class Sierra_RV50X(Instrument):
     def program(self) -> str:
         return "\n".join(
             [
-                If(
+                str(If(
                     functions.TimeIsBetween(2, 3, 1440, "min"),
                     logic=f"{self.variables['Modem_Power']} = False",
-                ).Else(f"{self.variables['Modem_Power']} = True"),
-                If(
+                ).Else(f"{self.variables['Modem_Power']} = True")),
+                str(If(
                     self.dependencies["batt_volt"].name,
                     "<",
                     self.dependencies["shutoff_voltage"].name,
@@ -1391,7 +1406,7 @@ class Sierra_RV50X(Instrument):
                         functions.TimeIsBetween(1, 4, 240, "min"),
                         logic=f"{self.variables['Modem_Power']} = True",
                     ).Else(f"{self.variables['Modem_Power']} = False"),
-                ),
+                )),
                 functions.SW12(self.wires["White"], self.variables["Modem_Power"]),
             ]
         )
@@ -1402,6 +1417,7 @@ class Campbell_SnowVue10(Instrument):
     model: str = "SnowVue10"
     type: str = "Snow"
     is_sdi12: bool = True
+    _id: str = "campbell_snowvue10"
     def __post_init__(self):
         self.wires = WiringDiagram(
             Wire("White", WireOptions.C1, "SDI-12 data SDI_ADD: 1"),
@@ -1537,7 +1553,7 @@ class Apogee_SP510(Instrument):
     manufacturer: str = "Apogee"
     model: str = "SP-510 SS"
     type: str = "Pyranometer"
-
+    _id: str = "apogee_sp510"
     def __post_init__(self):
 
         self.wires = WiringDiagram(
@@ -1614,20 +1630,20 @@ class Apogee_SP510(Instrument):
         ])
 
 INSTRUMENTS = {
-    "RMYoung_05108_77": RMYoung_05108_77,
-    "Setra_CS100": Setra_CS100,
-    "Vaisala_HMP155": Vaisala_HMP155,
-    "Acclima_TDR310N": Acclima_TDR310N,
-    "RMYoung_09106": RMYoung_09106,
-    "ProStar_EMC1": ProStar_EMC1,
-    "CR1000X_Battery": CR1000X_Battery,
-    "CR1000X_PanelTemp": CR1000X_PanelTemp,
-    "EnviroCams_iPatrol": EnviroCams_iPatrol,
-    "EnviroCams_Scout": EnviroCams_Scout,
-    "SparkFun_Door_Switch": SparkFun_Door_Switch,
-    "OTT_PLS500": OTT_PLS500,
-    "OTT_Pluvio": OTT_Pluvio,
-    "Sierra_RV50X": Sierra_RV50X,
-    "Campbell_SnowVue10": Campbell_SnowVue10,
-    "Apogee_SP510": Apogee_SP510,
+    RMYoung_05108_77._id: RMYoung_05108_77,
+    Setra_CS100._id: Setra_CS100,
+    Vaisala_HMP155._id: Vaisala_HMP155,
+    Acclima_TDR310N._id: Acclima_TDR310N,
+    RMYoung_09106._id: RMYoung_09106,
+    ProStar_EMC1._id: ProStar_EMC1,
+    CR1000X_Battery._id: CR1000X_Battery,
+    CR1000X_PanelTemp._id: CR1000X_PanelTemp,
+    EnviroCams_iPatrol._id: EnviroCams_iPatrol,
+    EnviroCams_Scout._id: EnviroCams_Scout,
+    SparkFun_Door_Switch._id: SparkFun_Door_Switch, 
+    OTT_PLS500._id: OTT_PLS500,
+    OTT_Pluvio._id: OTT_Pluvio,
+    Sierra_RV50X._id: Sierra_RV50X,
+    Campbell_SnowVue10._id: Campbell_SnowVue10,
+    Apogee_SP510._id: Apogee_SP510,
 }

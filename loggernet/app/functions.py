@@ -10381,7 +10381,7 @@ def StrComp(
 def SW12(
     SW12Chan: Literal["SW12_1", "SW12_2", "SW12_CSIO"],
     State: Variable | Constant | Expression | Array | Integer | ConstantInteger,
-    Option: Literal["Omitted", "0", "1"],
+    Option: Literal["Omitted", "0", "1"] | None = None,
 ) -> str:
     """For a full description of this function, visit [https://help.campbellsci.com/crbasic/cr1000x/Content/Instructions/sw12.htm](https://help.campbellsci.com/crbasic/cr1000x/Content/Instructions/sw12.htm).
 
@@ -10400,6 +10400,8 @@ def SW12(
                   str: A string of the CRBasic function call.
 
     """
+    if Option is None:
+        return f"SW12({SW12Chan},{State},{Option})"
     return f"SW12({SW12Chan},{State},{Option})"
 
 
