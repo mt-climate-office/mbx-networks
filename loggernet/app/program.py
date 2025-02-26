@@ -53,13 +53,12 @@ class Program:
 
     # TODO: Implement logic to make sure if an instruemnt has a dependency,
     # that the dependency indeed exists.
-    def __validate_dependencies(self): 
-        ...
+    def __validate_dependencies(self): ...
 
     def __find_tables(self):
         tables = {}
         for instrument in self.instruments:
-            try: 
+            try:
                 tabs = instrument.tables
             except NotImplementedError:
                 continue
@@ -176,8 +175,12 @@ class Program:
         return s
 
 
-def elev_sdi12_rename(i: Instrument, which: Literal["sdi12", "elevation", "both", "none"]) -> None:
-    assert which in ["sdi12", "elevation", "both", "none"], "'which' must be sdi12, elevation, or both."
+def elev_sdi12_rename(
+    i: Instrument, which: Literal["sdi12", "elevation", "both", "none"]
+) -> None:
+    assert which in ["sdi12", "elevation", "both", "none"], (
+        "'which' must be sdi12, elevation, or both."
+    )
     if which == "none":
         return i
     pattern = r"\(\d+\)"
@@ -189,7 +192,7 @@ def elev_sdi12_rename(i: Instrument, which: Literal["sdi12", "elevation", "both"
         elif which == "sdi12":
             if not re.search(pattern, v.name):
                 v.rename_to = f"{v.name}_id{i.sdi12_address}"
-        else: 
+        else:
             if not re.search(pattern, v.name):
                 v.rename_to = f"{v.name}_{i.elevation:04}"
 
@@ -208,4 +211,3 @@ def soil_slow_seq_match(p: Program) -> None:
             if ss_logic == (new_logic := probe.slow_sequence.logic):
                 ss_logic += new_logic
             probe.slow_sequence = None
-

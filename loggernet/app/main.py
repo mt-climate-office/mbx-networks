@@ -1,16 +1,14 @@
-from fastapi import FastAPI, File, UploadFile, HTTPException, Depends, Query,Path, Body
+from fastapi import FastAPI, File, UploadFile, HTTPException, Query, Path, Body
 from fastapi.responses import JSONResponse, FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 import subprocess
-from sqlalchemy.orm import Session
-import uuid
 import os
 import io
 from app import schemas
-from app.instruments import INSTRUMENTS, Instrument
-from app.program import Program, elev_sdi12_rename, soil_slow_seq_match
+from app.instruments import INSTRUMENTS
+from app.program import Program, elev_sdi12_rename
 import datetime as dt
-from typing import Annotated, Any
+from typing import Annotated
 
 app = FastAPI()
 app.mount("/static", StaticFiles(directory="/app/app/static"), name="static")
@@ -18,6 +16,7 @@ app.mount("/static", StaticFiles(directory="/app/app/static"), name="static")
 # @app.get("/test")
 # async def read_root():
 #     return FileResponse("/app/app/static/index.html")
+
 
 @app.post("/compile")
 async def check_compile(file: UploadFile = File(...)):
@@ -60,7 +59,7 @@ async def check_compile(file: UploadFile = File(...)):
 @app.get("/instruments")
 async def get_instruments(q: Annotated[schemas.NamesOnly, Query()]):
     if q.names_only:
-        return {'instruments': list(INSTRUMENTS.keys())}
+        return {"instruments": list(INSTRUMENTS.keys())}
     instances = {}
     for _, instrument in INSTRUMENTS.items():
         instances[instrument._id] = instrument(elevation=1, sdi12_address=1).to_json()
@@ -70,9 +69,10 @@ async def get_instruments(q: Annotated[schemas.NamesOnly, Query()]):
 @app.get("/instruments/{instrument}")
 async def get_instrument(instrument: Annotated[schemas.ValidInstruments, Path]):
     instance = INSTRUMENTS[instrument.value](elevation=1, sdi12_address=1)
-    
+
     out = instance.to_json()
     return out
+
 
 # my_sensors = [
 #     Vaisala_HMP155(200),
@@ -87,36 +87,41 @@ async def get_instrument(instrument: Annotated[schemas.ValidInstruments, Path]):
 #     "test program", my_sensors, "SequentialMode", True, transform=soil_slow_seq_match
 # )
 
-def find_instrument(target: str, instruments: list[schemas.ProgramInstruments]) -> schemas.ProgramInstruments | None:
+
+def find_instrument(
+    target: str, instruments: list[schemas.ProgramInstruments]
+) -> schemas.ProgramInstruments | None:
     for instrument in instruments:
         if instrument._id == target:
             return instrument
     return None
 
+
 @app.post("/program")
 async def build_program(
-    instruments: Annotated[list[schemas.ProgramInstruments],Body()]
+    instruments: Annotated[list[schemas.ProgramInstruments], Body()],
 ):
     program_instruments = []
     for instrument in instruments:
         instance = INSTRUMENTS[instrument.name](
-            elevation = instrument.elevation,
-            sdi12_address = instrument.sdi12_address,
-            transform=lambda x: elev_sdi12_rename(x, instrument.var_name_inclusion.lower())
+            elevation=instrument.elevation,
+            sdi12_address=instrument.sdi12_address,
+            transform=lambda x: elev_sdi12_rename(
+                x, instrument.var_name_inclusion.lower()
+            ),
         )
 
         if instance.wires:
             for wire in instance.wires.args:
                 user_def_wiring = instrument.wiring[wire.wire]
                 wire.port = user_def_wiring
-            
+
         program_instruments.append(instance)
-    
+
     for instrument in instruments:
         if not instrument.dependencies:
             continue
         for dep, meta in instrument.dependencies.items():
-
             # Find the instances of instrument that will populate the program
             program_instrument = find_instrument(instrument.name, program_instruments)
             target = find_instrument(meta["_id"], program_instruments)
@@ -125,15 +130,15 @@ async def build_program(
                     status_code=400,
                     detail=f"Could not find dependency {meta['_id']} for {instrument.name}",
                 )
-            
+
             # Add the dependency to the instrument
-            the_dep = target.variables[meta['variable']]
-            program_instrument.dependencies.map_dependency(meta['variable'], the_dep)
-    
-    filename = f"CSI_LoggerNet_{str(dt.date.today()).replace("-", "")}.CR1X"
+            the_dep = target.variables[meta["variable"]]
+            program_instrument.dependencies.map_dependency(meta["variable"], the_dep)
+
+    filename = f"CSI_LoggerNet_{str(dt.date.today()).replace('-', '')}.CR1X"
     program = Program(
         filename,
-        instruments = program_instruments,
+        instruments=program_instruments,
         mode="SequentialMode",
     )
 
@@ -141,8 +146,9 @@ async def build_program(
     return StreamingResponse(
         stream,
         media_type="text/plain",
-        headers={"Content-Disposition": f"attachment; filename={filename}"}
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
     )
+
 
 @app.get("/program/build")
 async def program_builder_form():
@@ -150,8 +156,6 @@ async def program_builder_form():
 
 
 @app.get("/program/{station}")
-async def build_program_from_station(
-    station: str
-):
-    #TODO: This
+async def build_program_from_station(station: str):
+    # TODO: This
     ...

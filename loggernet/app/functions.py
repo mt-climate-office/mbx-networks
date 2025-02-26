@@ -71,9 +71,10 @@ class Variable:
         return self.rename_to or self.name
 
     def declaration_str(self) -> str:
-
         if self.var_type == VarType.FIELD_ONLY:
-            raise ValueError("declaration_str should not be called when Variable is of FIELD_ONLY type")
+            raise ValueError(
+                "declaration_str should not be called when Variable is of FIELD_ONLY type"
+            )
         if self.var_type != VarType.ALIAS:
             v_name = self.rename_to or self.name
         else:
@@ -6938,7 +6939,7 @@ def Maximum(
         "UINT2",
         "UINT4",
         "FP2",
-        "IEEE4"
+        "IEEE4",
     ],
     DisableVar: Variable | Constant | Expression,
     Time: Literal["0", "1"],
@@ -7758,7 +7759,7 @@ def PortGet(
 def PortSet(
     Port: Literal["C1", "C2", "C3", "C4", "C5", "C6", "C7", "C8"],
     State: Literal["0", "≠0"],
-    Option: Literal["Omitted", "0", "1"],
+    Option: Literal["Omitted", "0", "1"] | None = None,
 ) -> str:
     """For a full description of this function, visit [https://help.campbellsci.com/crbasic/cr1000x/Content/Instructions/portset.htm](https://help.campbellsci.com/crbasic/cr1000x/Content/Instructions/portset.htm).
 
@@ -7779,6 +7780,8 @@ def PortSet(
                     str: A string of the CRBasic function call.
 
     """
+    if Option is None:
+        return f"PortSet({Port},{State})"
     return f"PortSet({Port},{State},{Option})"
 
 
@@ -8438,7 +8441,7 @@ def Sample(
         "UINT2",
         "UINT4",
         "FP2",
-        "IEEE4"
+        "IEEE4",
     ],
 ) -> str:
     """For a full description of this function, visit [https://help.campbellsci.com/crbasic/cr1000x/Content/Instructions/sample.htm](https://help.campbellsci.com/crbasic/cr1000x/Content/Instructions/sample.htm).
@@ -10199,7 +10202,7 @@ def SplitStr(
 
 def Sprintf(
     Dest: Variable | Constant | Expression | Array | Integer | ConstantInteger,
-    Format: Literal["+", "Space", "-", "#", "0"],
+    Format: Literal["+", "Space", "-", "#", "0", "%f"],
     *args: Variable | Constant | Expression | Array | Integer | ConstantInteger,
 ) -> str:
     """For a full description of this function, visit [https://help.campbellsci.com/crbasic/cr1000x/Content/Instructions/sprintf.htm](https://help.campbellsci.com/crbasic/cr1000x/Content/Instructions/sprintf.htm).
@@ -10220,7 +10223,7 @@ def Sprintf(
                     str: A string of the CRBasic function call.
 
     """
-    return f"Sprintf({Dest},{Format},{','.join(x for x in args)})"
+    return f"Sprintf({Dest},{Format},{','.join(str(x) for x in args)})"
 
 
 def SolarPosition(

@@ -35,6 +35,8 @@ class If:
             self.logic = [self.logic]
         elif isinstance(self.logic, If):
             self.logic = str(self.logic)
+        elif isinstance(self.logic, For):
+            self.logic = str(self.logic)
 
         code.append(f"    {'\n    '.join(x for x in self.logic)}")
 

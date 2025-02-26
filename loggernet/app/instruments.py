@@ -190,7 +190,6 @@ class WireOptions(Enum):
     DIFF_8_H = "8"
     DIFF_8_L = "8"
 
-
     def __str__(self):
         return self.value
 
@@ -202,7 +201,8 @@ class Wire:
     description: Optional[str] = ""
 
     def __str__(self):
-        return f"{self.wire + ':':<8} {self.port.value:<8} {self.description:<10}"
+        port = "Not wired to Logger —" if self.port is None else self.port.value
+        return f"{self.wire + ':':<8} {port:<8} {self.description:<10}"
 
 
 class WiringDiagram:
@@ -235,28 +235,32 @@ class Dependency:
 class Dependencies:
     parent: Instrument = field(repr=False)
     dependencies: list[Dependency]
+
     def __init__(self, parent: Instrument, *dependencies: Dependency):
         self.parent = parent
         self.dependencies = dependencies
 
-    def _internal_getitem(self, item: str, return_mapped: bool = True) -> Variable | Dependency:
+    def _internal_getitem(
+        self, item: str, return_mapped: bool = True
+    ) -> Variable | Dependency:
         for dep in self.dependencies:
             if dep.name == item:
                 if return_mapped:
                     if dep.mapped_dep is None:
-                        raise ValueError(f"A dependency has not been mapped for {self.parent.manufacturer} {self.parent.model} ({self.parent.type})")
+                        raise ValueError(
+                            f"A dependency has not been mapped for {self.parent.manufacturer} {self.parent.model} ({self.parent.type})"
+                        )
                     return dep.mapped_dep
                 else:
                     return dep
         raise ValueError(f"{item} is not a declared dependency.")
-    
+
     def __getitem__(self, item: str) -> Variable:
         return self._internal_getitem(item, True)
-    
+
     def map_dependency(self, item: str, v: Variable) -> None:
         item: Dependency = self._internal_getitem(item, False)
         item.mapped_dep = v
-        
 
 
 @dataclass
@@ -282,7 +286,9 @@ class Instrument(ABC):
             self._transform()
         self.check_unique_names()
         if self.is_sdi12 and not self.sdi12_address:
-            raise ValueError("This is an SDI12 device and an SDI12 address isn't specified.")
+            raise ValueError(
+                "This is an SDI12 device and an SDI12 address isn't specified."
+            )
 
     def _transform(self):
         self.transform(self)
@@ -323,10 +329,10 @@ class Instrument(ABC):
     @property
     def slow_sequence(self) -> SlowSequence:
         raise NotImplementedError()
-    
+
     def to_json(self) -> dict[str, Any]:
-        try: 
-            tables = {x.name: x for x in self.tables} 
+        try:
+            tables = {x.name: x for x in self.tables}
         except (NotImplementedError, TypeError):
             tables = "No tables defined for this instrument."
         out = {
@@ -334,17 +340,19 @@ class Instrument(ABC):
             "Manufacturer": self.manufacturer,
             "Model": self.model,
             "Type": self.type,
-            "Wiring": {x.wire: asdict(x) for x in self.wires.args} if self.wires else "No Wiring",
+            "Wiring": {x.wire: asdict(x) for x in self.wires.args}
+            if self.wires
+            else "No Wiring",
             "Tables": tables,
             "Variables": self.variables,
-            "SDI12": self.is_sdi12
+            "SDI12": self.is_sdi12,
         }
 
         if self.dependencies:
             out["Dependencies"] = self.dependencies.dependencies
-        
+
         return out
-    
+
     def map_dependency(self, item: str, dep: Variable) -> None:
         self.dependencies.map_dependency(item, dep)
 
@@ -385,14 +393,15 @@ class Instrument(ABC):
             ]
         )
 
+
 @dataclass
 class RMYoung_05108_77(Instrument):
     manufacturer: str = "RM Young"
     model: str = "05108-77"
     type: str = "Wind"
     _id: str = "rmyoung_05108_77"
-    def __post_init__(self):
 
+    def __post_init__(self):
         self.wires = WiringDiagram(
             Wire("Red", WireOptions.P1, "WS Signal      WS SIG"),
             Wire("White", WireOptions.VX2, "WD Excite      WD EXC"),
@@ -407,7 +416,7 @@ class RMYoung_05108_77(Instrument):
             Variable("wind_spd", VarType.PUBLIC, units="m s-1"),
             Variable("wind_dir", VarType.PUBLIC, units="arcdeg"),
             Variable("wind_timer", VarType.PUBLIC, units="sec"),
-            Variable("windgust", VarType.FIELD_ONLY)
+            Variable("windgust", VarType.FIELD_ONLY),
         ]
         return super().__post_init__()
 
@@ -499,14 +508,15 @@ class RMYoung_05108_77(Instrument):
             ]
         )
 
+
 @dataclass
 class RMYoung_09106(Instrument):
     manufacturer: str = "RM Young"
     model: str = "09106"
     type: str = "Wind"
     _id: str = "rmyoung_09106"
-    def __post_init__(self):
 
+    def __post_init__(self):
         self.wires = WiringDiagram(
             Wire("Red", WireOptions._12V, "12v Power"),
             Wire("White", WireOptions.AG, "Signal G"),
@@ -519,7 +529,7 @@ class RMYoung_09106(Instrument):
             Variable("wind_spd", VarType.PUBLIC, units="m s-1"),
             Variable("wind_dir", VarType.PUBLIC, units="arcdeg"),
             Variable("wind_timer", VarType.PUBLIC, units="sec"),
-            Variable("windgust", VarType.FIELD_ONLY)
+            Variable("windgust", VarType.FIELD_ONLY),
         ]
         return super().__post_init__()
 
@@ -593,14 +603,15 @@ class RMYoung_09106(Instrument):
             ]
         )
 
+
 @dataclass
 class Setra_CS100(Instrument):
     manufacturer: str = "Setra"
     model: str = "CS100"
     type: str = "Barometer"
     _id: str = "setra_cs100"
-    def __post_init__(self):
 
+    def __post_init__(self):
         self.wires = WiringDiagram(
             Wire("Blue", WireOptions.SE2, "Signal H"),
             Wire("Yellow", WireOptions.AG, "Signal G"),
@@ -641,14 +652,15 @@ class Setra_CS100(Instrument):
             ]
         )
 
+
 @dataclass
 class Vaisala_HMP155(Instrument):
     model: str = "HMP-155 (RS-485)"
     manufacturer: str = "Vaisala"
     type: str = "RH/T"
     _id: str = "vaisala_hmp155"
-    def __post_init__(self):
 
+    def __post_init__(self):
         self.wires = WiringDiagram(
             Wire("Brown", WireOptions.COM7, "RS485 B"),
             Wire("Pink", WireOptions.C8, "RS485 A"),
@@ -747,6 +759,7 @@ class Vaisala_HMP155(Instrument):
             ]
         )
 
+
 @dataclass
 class Acclima_TDR310N(Instrument):
     model: str = "Acclima"
@@ -754,8 +767,8 @@ class Acclima_TDR310N(Instrument):
     type: str = "Soil"
     _id: str = "acclima_tdr310n"
     is_sdi12: bool = True
-    def __post_init__(self):
 
+    def __post_init__(self):
         if self.sdi12_address is None:
             raise AttributeError(
                 "This is an SDI12 device and an SDI12 address must be assigned."
@@ -880,16 +893,17 @@ class Acclima_TDR310N(Instrument):
     def slow_sequence(self, value: SlowSequence | None):
         self._slow_sequence = value
 
+
 @dataclass
 class ProStar_EMC1(Instrument):
     model: str = "ProStar"
     manufacturer: str = "EMC-1"
     type: str = "Charge Data"
     _id: str = "prostar_emc1"
-    def __post_init__(self):
 
+    def __post_init__(self):
         self.variables = [
-            Variable("ModbusSocker", VarType.PUBLIC, DataType.FLOAT),
+            Variable("ModbusSocket", VarType.PUBLIC, DataType.FLOAT),
             Variable("ModbusResult", VarType.PUBLIC),
             Variable("ChgCntDat(82)", VarType.DIM, DataType.LONG),
             Variable("i", VarType.DIM),
@@ -954,33 +968,21 @@ class ProStar_EMC1(Instrument):
                 "ChargeData",
                 functions.Sample(1, self.variables["charge_current"], "Long"),
                 functions.Sample(1, self.variables["array_current"], "Long"),
-                functions.Sample(
-                    1, self.variables["battery_terminal_voltage"], "Long"
-                ),
+                functions.Sample(1, self.variables["battery_terminal_voltage"], "Long"),
                 functions.Sample(1, self.variables["load_voltage"], "Long"),
-                functions.Sample(
-                    1, self.variables["net_battery_current"], "Long"
-                ),
+                functions.Sample(1, self.variables["net_battery_current"], "Long"),
                 functions.Sample(1, self.variables["load_current"], "Long"),
                 functions.Sample(1, self.variables["heatsink_temp"], "Long"),
                 functions.Sample(1, self.variables["battery_temp"], "Long"),
                 functions.Sample(1, self.variables["ambient_temp"], "Long"),
                 functions.Sample(1, self.variables["charge_state"], "Long"),
-                functions.Sample(
-                    1, self.variables["total_ah_charge_hi"], "Long"
-                ),
-                functions.Sample(
-                    1, self.variables["total_ah_charge_lo"], "Long"
-                ),
+                functions.Sample(1, self.variables["total_ah_charge_hi"], "Long"),
+                functions.Sample(1, self.variables["total_ah_charge_lo"], "Long"),
                 functions.Sample(1, self.variables["load_state"], "Long"),
                 functions.Sample(1, self.variables["total_ah_load_hi"], "Long"),
                 functions.Sample(1, self.variables["total_ah_load_lo"], "Long"),
-                functions.Sample(
-                    1, self.variables["daily_absorption_time"], "Long"
-                ),
-                functions.Sample(
-                    1, self.variables["daily_equalization_time"], "Long"
-                ),
+                functions.Sample(1, self.variables["daily_absorption_time"], "Long"),
+                functions.Sample(1, self.variables["daily_equalization_time"], "Long"),
                 functions.Sample(1, self.variables["daily_float_time"], "Long"),
             ),
         ]
@@ -990,79 +992,95 @@ class ProStar_EMC1(Instrument):
         SlowSequence(
             "Charge",
             Scan(1, "Min", 0, 0),
-            code_string="\n".join(
+            logic="\n".join(
                 [
                     f"{self.variables['ModbusSocket']}={functions.TCPOpen('192.168.1.253', 502, 1)}",
-                    f"{functions.ModbusClient(self.variables['ModbusResult'], self.variables['ModbusSocket'], 9600, 1, 3, {str(self.variable['ChgCntDat(82)']).replace('(82)', ''), 1, 82, 3, 1500, 3})}"
-                    f" {self.variables['batt_volt']} = ScaleToF16({str(self.variable['ChgCntDat(82)']).replace('(82)', '(25)')})\n",
-                    If(
+                    functions.ModbusClient(
+                        self.variables["ModbusResult"],
                         self.variables["ModbusSocket"],
-                        "=",
-                        0,
-                        logic=For(
-                            logic=f"{str(self.variables['ChgCntDat'].replace('82', 'i'))} = NAN",
-                            v=self.variables["i"],
-                            start=1,
-                            end=82,
-                        ),
+                        9600,
+                        1,
+                        3,
+                        str(self.variables["ChgCntDat(82)"]).replace("(82)", ""),
+                        1,
+                        82,
+                        3,
+                        1500,
+                        3,
+                    ),
+                    f" {self.variables['batt_volt']} = ScaleToF16({str(self.variables['ChgCntDat(82)']).replace('(82)', '(25)')})\n",
+                    str(
+                        If(
+                            self.variables["ModbusSocket"],
+                            "=",
+                            0,
+                            logic=For(
+                                logic=f"{str(self.variables['ChgCntDat(82)']).replace('82', 'i')} = NAN",
+                                v=self.variables["i"],
+                                start=1,
+                                end=82,
+                            ),
+                        )
                     ),
                 ]
             ),
         )
 
+
 @dataclass
-class CR1000X_Battery(Instrument): 
+class CR1000X_Battery(Instrument):
     manufacturer: str = "Campbell Scientific"
     model: str = "CR1000X"
     type: str = "Charge Data"
     _id: str = "cr1000x_charge"
+
     def __post_init__(self):
         self.variables = [
             Variable("batt_volt", VarType.PUBLIC, units="v"),
-            Variable("shutoff_voltage", VarType.PUBLIC)
+            Variable("shutoff_voltage", VarType.PUBLIC),
         ]
         return super().__post_init__()
-    
 
     @property
     def tables(self) -> list[Table]:
-        return [Table(
-            "FiveMin",
-            TableItem(
-                functions.Sample(1, self.variables["batt_volt"], "FP2"), 
-                [self.variables["batt_volt"]]
+        return [
+            Table(
+                "FiveMin",
+                TableItem(
+                    functions.Sample(1, self.variables["batt_volt"], "FP2"),
+                    [self.variables["batt_volt"]],
+                ),
             )
-        )]
+        ]
 
     @property
     def pre_scan(self):
-        return f"{self.variables["shutoff_voltage"]} = 11.4"
+        return f"{self.variables['shutoff_voltage']} = 11.4"
 
     @property
     def program(self):
         return functions.Battery(self.variables["batt_volt"])
 
+
 @dataclass
 class CR1000X_PanelTemp(Instrument):
-
     manufacturer: str = "Campbell Scientific"
     model: str = "CR1000X"
     type: str = "Temperature"
     _id: str = "cr1000x_temp"
+
     def __post_init__(self):
-        self.variables = [
-            Variable("panel_temp", VarType.PUBLIC, units = "deg C")
-        ]
+        self.variables = [Variable("panel_temp", VarType.PUBLIC, units="deg C")]
 
         return super().__post_init__()
-    
-    @property 
+
+    @property
     def program(self):
         return functions.PanelTemp(self.variables["panel_temp"], "60")
 
+
 @dataclass
 class Generic_IPCamera(Instrument):
-
     def __post_init__(self):
         self.wires = WiringDiagram(
             Wire("Black", WireOptions.G, "#4 Black to Ground"),
@@ -1080,14 +1098,12 @@ class Generic_IPCamera(Instrument):
         ]
         self.dependencies = Dependencies(
             self,
+            Dependency("batt_volt", "Variable measuring the current battery voltage."),
             Dependency(
-                "batt_volt", "Variable measuring the current battery voltage."
+                "shutoff_voltage",
+                "A variable storing the voltage at which the camera should shut off for battery savings.",
             ),
-            Dependency(
-                "shutoff_voltage", "A variable storing the voltage at which the camera should shut off for battery savings."
-            )
         )
-
 
         return super().__post_init__()
 
@@ -1102,34 +1118,44 @@ class Generic_IPCamera(Instrument):
 
     @property
     def program(self):
-        return "\n".join([
-            str(If(
-                self.variables["Camera_Power_Manual"],
-                logic=functions.SW12(self.wires["Red"], self.variables["Camera_Power"]),
-            ).Else(
-                "\n".join([
-                    str(
-                        If(
-                            functions.TimeIsBetween(2, 3, 1400, "min"),
-                            logic=f"{self.variables['Camera_Power']}=False",
-                        ).Else(f"{self.variables['Camera_Power']}=True")
-                    ),
-                    str(
-                        If(
-                            self.dependencies["batt_volt"].name,
-                            "<",
-                            self.dependencies["shutoff_voltage"].name,
-                            logic=f"{self.variables['Camera_Power']}=false",
-                        )
-                    ),
-                    str(
-                        functions.SW12(
+        return "\n".join(
+            [
+                str(
+                    If(
+                        self.variables["Camera_Power_Manual"],
+                        logic=functions.SW12(
                             self.wires["Red"], self.variables["Camera_Power"]
+                        ),
+                    ).Else(
+                        "\n".join(
+                            [
+                                str(
+                                    If(
+                                        functions.TimeIsBetween(2, 3, 1400, "min"),
+                                        logic=f"{self.variables['Camera_Power']}=False",
+                                    ).Else(f"{self.variables['Camera_Power']}=True")
+                                ),
+                                str(
+                                    If(
+                                        self.dependencies["batt_volt"].name,
+                                        "<",
+                                        self.dependencies["shutoff_voltage"].name,
+                                        logic=f"{self.variables['Camera_Power']}=false",
+                                    )
+                                ),
+                                str(
+                                    functions.SW12(
+                                        self.wires["Red"],
+                                        self.variables["Camera_Power"],
+                                    )
+                                ),
+                            ]
                         )
-                    ),
-                ])
-            ))
-        ])
+                    )
+                )
+            ]
+        )
+
 
 @dataclass
 class EnviroCams_iPatrol(Generic_IPCamera):
@@ -1137,9 +1163,10 @@ class EnviroCams_iPatrol(Generic_IPCamera):
     model: str = "iPatrol PTZ"
     type: str = "IP Camera"
     _id: str = "envirocams_ipatrol"
-    def __post_init__(self):
 
+    def __post_init__(self):
         return super().__post_init__()
+
 
 @dataclass
 class EnviroCams_Scout(Generic_IPCamera):
@@ -1147,9 +1174,10 @@ class EnviroCams_Scout(Generic_IPCamera):
     model: str = "Scout PTZ"
     type: str = "IP Camera"
     _id: str = "envirocams_scout"
-    def __post_init__(self):
 
+    def __post_init__(self):
         return super().__post_init__()
+
 
 @dataclass
 class SparkFun_Door_Switch(Instrument):
@@ -1157,8 +1185,8 @@ class SparkFun_Door_Switch(Instrument):
     model: str = "Door Switch"
     type: str = "Door"
     _id: str = "sparkfun_door"
-    def __post_init__(self):
 
+    def __post_init__(self):
         self.wires = WiringDiagram(
             Wire("Red", WireOptions._5V, "5v Power"),
             Wire("Black", WireOptions.C4, "Open/Closed Status"),
@@ -1188,6 +1216,9 @@ class SparkFun_Door_Switch(Instrument):
                     ),
                     [self.variables["door_timer"]],
                 ),
+                size=-1,
+                card_out=CardOut(),
+                data_interval=DataInterval(0, 120, "min", 10),
             ),
         ]
 
@@ -1195,31 +1226,36 @@ class SparkFun_Door_Switch(Instrument):
     def program(self) -> str:
         return "\n".join(
             [
-                If(
-                    functions.CheckPort(self.wires["Black"]),
-                    logic="\n".join(
-                        [
-                            f"{self.variables['door']} = 0",
-                            f"{self.variables['door_timer']} = 0",
-                            functions.Timer(1, "2", "3"),
-                        ]
-                    ),
-                ).Else(
-                    "\n".join(
-                        [
-                            functions.Timer(1, "2", "0"),
-                            f"{self.variables['door_timer']} = {functions.Timer(1, '2', '4')}",
-                            If(
-                                self.variables["door_timer"],
-                                ">",
-                                14400,
-                                logic=f"{self.variables['door']} = 0",
-                            ).Else(f"{self.variables['door']} = 1"),
-                        ]
+                str(
+                    If(
+                        functions.CheckPort(self.wires["Black"]),
+                        logic="\n".join(
+                            [
+                                f"{self.variables['door']} = 0",
+                                f"{self.variables['door_timer']} = 0",
+                                functions.Timer(1, "2", "3"),
+                            ]
+                        ),
+                    ).Else(
+                        "\n".join(
+                            [
+                                functions.Timer(1, "2", "0"),
+                                f"{self.variables['door_timer']} = {functions.Timer(1, '2', '4')}",
+                                str(
+                                    If(
+                                        self.variables["door_timer"],
+                                        ">",
+                                        14400,
+                                        logic=f"{self.variables['door']} = 0",
+                                    ).Else(f"{self.variables['door']} = 1")
+                                ),
+                            ]
+                        )
                     )
                 )
             ]
         )
+
 
 @dataclass
 class OTT_PLS500(Instrument):
@@ -1228,6 +1264,7 @@ class OTT_PLS500(Instrument):
     type: str = "Pressure Probe"
     _id: str = "ott_pls500"
     is_sdi12: bool = True
+
     def __post_init__(self):
         assert self.sdi12_address is not None, (
             "An SDI12 Address must be specified for this device."
@@ -1269,11 +1306,11 @@ class OTT_PLS500(Instrument):
 
     @property
     def slow_sequence(self) -> SlowSequence:
-        SlowSequence(
+        return SlowSequence(
             "Transducer",
             Scan(1, "Min", 0, 0),
             functions.SDI12Recorder(
-                self.variables["Transducer(3)"].replace("(3)", ""),
+                str(self.variables["Transducer(3)"]).replace("(3)", ""),
                 self.wires["Grey"],
                 self.sdi12_address,
                 "M!",
@@ -1284,6 +1321,7 @@ class OTT_PLS500(Instrument):
             ),
         )
 
+
 @dataclass
 class OTT_Pluvio(Instrument):
     manufacturer: str = "OTT"
@@ -1291,10 +1329,10 @@ class OTT_Pluvio(Instrument):
     type: str = "Precipitation"
     is_sdi12: bool = True
     _id: str = "ott_pluvio"
-    def __post_init__(self):
 
+    def __post_init__(self):
         self.wires = WiringDiagram(
-            Wire("Black", None, "DC Converter blac (out) (#1 not used)"),
+            Wire("Black", None, "DC Converter black (out) (#1 not used)"),
             Wire("Green", WireOptions.C5, "SDI-12 data SDI_ADD: 2"),
             Wire("White", WireOptions.G, "Data Ground"),
             Wire("Red", None, "24V DC Converter Out (Yellow)"),
@@ -1313,7 +1351,7 @@ class OTT_Pluvio(Instrument):
             Variable("Pluvio(7)", VarType.ALIAS, value="pluv_temp", units="deg C"),
             Variable("Pluvio(8)", VarType.ALIAS, value="pluv_heater", units="code"),
             Variable("Pluvio(9)", VarType.ALIAS, value="pluv_gagestat", units="code"),
-            Variable("pluv_flag", VarType.PUBLIC, value = 1)
+            Variable("pluv_flag", VarType.PUBLIC, value=1),
         ]
 
         return super().__post_init__()
@@ -1322,44 +1360,63 @@ class OTT_Pluvio(Instrument):
     def tables(self) -> list[Table]:
         return [
             Table(
-                "FiveMin", 
-                TableItem(functions.Totalize(1, self.variables["ppt"], "IEEE4", self.variables["pluv_flag"]), ["ppt"]),
-                TableItem(functions.Maximum(1, self.variables["ppt_max_rate"], "IEEE4", False, False), ["ppt_max_rate"]),
-                TableItem(functions.Sample(1, self.variables["pluv_fill"], "IEEE4"), ["pluv_fill"]),
-                TableItem(functions.Sample(1, self.variables["pluv_heater"], "FP2"), ["pluv_heater"])
+                "FiveMin",
+                TableItem(
+                    functions.Totalize(
+                        1, self.variables["ppt"], "IEEE4", self.variables["pluv_flag"]
+                    ),
+                    ["ppt"],
+                ),
+                TableItem(
+                    functions.Maximum(
+                        1, self.variables["ppt_max_rate"], "IEEE4", False, False
+                    ),
+                    ["ppt_max_rate"],
+                ),
+                TableItem(
+                    functions.Sample(1, self.variables["pluv_fill"], "IEEE4"),
+                    ["pluv_fill"],
+                ),
+                TableItem(
+                    functions.Sample(1, self.variables["pluv_heater"], "FP2"),
+                    ["pluv_heater"],
+                ),
             ),
             Table(
                 "StatusReport",
                 TableItem(functions.Sample(1, self.variables["pluv_gagestat"], "FP2")),
                 TableItem(functions.Sample(1, self.variables["pluv_temp"], "FP2")),
-                data_interval=DataInterval(0, 120, "min", 10)
-            )
+                size=-1,
+                card_out=CardOut(),
+                data_interval=DataInterval(0, 120, "min", 10),
+            ),
         ]
 
-
     @property
-    def end_scan(self) -> str:
-        return f"{self.variables["pluv_flag"]} = 1"
-    
+    def post_scan(self) -> str:
+        return f"{self.variables['pluv_flag']} = 1"
+
     @property
     def slow_sequence(self) -> SlowSequence:
         return SlowSequence(
             "pluvio",
             Scan(1, "Min", 0, 0),
-            logic = "\n".join([
-                functions.SDI12Recorder(
-                    self.variables["Pluvio(9)"].name.replace("9", ""),
-                    self.wires["Green"],
-                    self.sdi12_address,
-                    "C!",
-                    1,
-                    0
-                    -1,
-                    1
-                ),
-                f"{self.variables["pluv_flag"]} = 0"
-            ])
+            logic="\n".join(
+                [
+                    functions.SDI12Recorder(
+                        self.variables["Pluvio(9)"].name.replace("9", ""),
+                        self.wires["Green"],
+                        self.sdi12_address,
+                        "C!",
+                        1,
+                        0 - 1,
+                        1,
+                    ),
+                    f"{self.variables['pluv_flag']} = 0",
+                ]
+            ),
         )
+
 
 @dataclass
 class Sierra_RV50X(Instrument):
@@ -1367,8 +1424,8 @@ class Sierra_RV50X(Instrument):
     model = "RV50X"
     type = "Modem"
     _id = "sierra_rv50x"
-    def __post_init__(self):
 
+    def __post_init__(self):
         self.wires = WiringDiagram(
             Wire("Black", WireOptions.G),
             Wire("Red", WireOptions._12V, "(On CR1000X)"),
@@ -1378,12 +1435,11 @@ class Sierra_RV50X(Instrument):
         self.variables = [Variable("Modem_Power", VarType.PUBLIC, DataType.BOOLEAN)]
         self.dependencies = Dependencies(
             self,
+            Dependency("batt_volt", "Variable measuring the current battery voltage."),
             Dependency(
-                "batt_volt", "Variable measuring the current battery voltage."
+                "shutoff_voltage",
+                "A variable storing the voltage at which the camera should shut off for battery savings.",
             ),
-            Dependency(
-                "shutoff_voltage", "A variable storing the voltage at which the camera should shut off for battery savings."
-            )
         )
 
         return super().__post_init__()
@@ -1396,22 +1452,29 @@ class Sierra_RV50X(Instrument):
     def program(self) -> str:
         return "\n".join(
             [
-                str(If(
-                    functions.TimeIsBetween(2, 3, 1440, "min"),
-                    logic=f"{self.variables['Modem_Power']} = False",
-                ).Else(f"{self.variables['Modem_Power']} = True")),
-                str(If(
-                    self.dependencies["batt_volt"].name,
-                    "<",
-                    self.dependencies["shutoff_voltage"].name,
-                    logic=str(If(
-                        functions.TimeIsBetween(1, 4, 240, "min"),
-                        logic=f"{self.variables['Modem_Power']} = True",
-                    ).Else(f"{self.variables['Modem_Power']} = False")),
-                )),
+                str(
+                    If(
+                        functions.TimeIsBetween(2, 3, 1440, "min"),
+                        logic=f"{self.variables['Modem_Power']} = False",
+                    ).Else(f"{self.variables['Modem_Power']} = True")
+                ),
+                str(
+                    If(
+                        self.dependencies["batt_volt"].name,
+                        "<",
+                        self.dependencies["shutoff_voltage"].name,
+                        logic=str(
+                            If(
+                                functions.TimeIsBetween(1, 4, 240, "min"),
+                                logic=f"{self.variables['Modem_Power']} = True",
+                            ).Else(f"{self.variables['Modem_Power']} = False")
+                        ),
+                    )
+                ),
                 functions.SW12(self.wires["White"], self.variables["Modem_Power"]),
             ]
         )
+
 
 @dataclass
 class Campbell_SnowVue10(Instrument):
@@ -1420,43 +1483,73 @@ class Campbell_SnowVue10(Instrument):
     type: str = "Snow"
     is_sdi12: bool = True
     _id: str = "campbell_snowvue10"
+
     def __post_init__(self):
         self.wires = WiringDiagram(
             Wire("White", WireOptions.C1, "SDI-12 data SDI_ADD: 1"),
             Wire("Brown", WireOptions._12V, "Fuse Block 0.5A fuse power"),
             Wire("Black", WireOptions.G, "Power Ground"),
-            Wire("Clear", WireOptions.AG)
+            Wire("Clear", WireOptions.AG),
         )
 
         self.variables = [
-            Variable("SnowVUE_Go", VarType.PUBLIC, DataType.BOOLEAN),  # When true, runs the SnowVUE10 measurement cycle
-            Variable("Set_D2G", VarType.PUBLIC, DataType.BOOLEAN),  # When true, sets the SnowVUE10 distance to ground
+            Variable(
+                "SnowVUE_Go", VarType.PUBLIC, DataType.BOOLEAN
+            ),  # When true, runs the SnowVUE10 measurement cycle
+            Variable(
+                "Set_D2G", VarType.PUBLIC, DataType.BOOLEAN
+            ),  # When true, sets the SnowVUE10 distance to ground
             Variable("SnowVUE(2)", VarType.PUBLIC),  # General SnowVUE variable
             Variable("Dist2Gnd", VarType.PUBLIC, units="m"),  # Distance to ground
-            Variable("SnowVUE(1)", VarType.ALIAS, value="Dist2Targ", units="m"),  # Distance from the SnowVUE10 to target
-            Variable("TCDT", VarType.PUBLIC, units="m"),  # Final temperature-corrected distance
+            Variable(
+                "SnowVUE(1)", VarType.ALIAS, value="Dist2Targ", units="m"
+            ),  # Distance from the SnowVUE10 to target
+            Variable(
+                "TCDT", VarType.PUBLIC, units="m"
+            ),  # Final temperature-corrected distance
             Variable("snow_depth", VarType.PUBLIC, units="cm"),  # Snow depth
-            Variable("snow_min", VarType.PUBLIC, units="cm"),  # Used to store snow_depth < 0
-            Variable("SnowVUE(2)", VarType.ALIAS, value="snow_depth_q"),  # Measurement quality number
-            Variable("FH", VarType.DIM, DataType.LONG),  # File Handle to use to set distance to ground
+            Variable(
+                "snow_min", VarType.PUBLIC, units="cm"
+            ),  # Used to store snow_depth < 0
+            Variable(
+                "SnowVUE(2)", VarType.ALIAS, value="snow_depth_q"
+            ),  # Measurement quality number
+            Variable(
+                "FH", VarType.DIM, DataType.LONG
+            ),  # File Handle to use to set distance to ground
             Variable("dummystr", VarType.DIM, DataType.STRING),  # Dummy string variable
             Variable("SnowVUE_Meta(8)", VarType.PUBLIC),  # Metadata calls
-            Variable("SnowVUE_Meta(2)", VarType.ALIAS, value="IntTemp", units="deg C"),  # Temperature inside sensor housing
-            Variable("SnowVUE_Meta(3)", VarType.ALIAS, value="IntRH", units="%"),  # Relative Humidity inside sensor housing
-            Variable("SnowVUE_Meta(4)", VarType.ALIAS, value="Pitch", units="deg"),  # Tilt (degrees) front to back
-            Variable("SnowVUE_Meta(5)", VarType.ALIAS, value="Roll", units="deg"),  # Tilt (degrees) side to side
-            Variable("SnowVUE_Meta(6)", VarType.ALIAS, value="SupVolt", units="v"),  # Voltage of supply from power source
-            Variable("SnowVUE_Meta(7)", VarType.ALIAS, value="ResFreq", units="kHz"),  # Resonate Frequency of Transducer
-            Variable("SnowVUE_Meta(8)", VarType.ALIAS, value="Alert", units="unitless"),  # Alert flag if ResFreq is out of tolerance
+            Variable(
+                "SnowVUE_Meta(2)", VarType.ALIAS, value="IntTemp", units="deg C"
+            ),  # Temperature inside sensor housing
+            Variable(
+                "SnowVUE_Meta(3)", VarType.ALIAS, value="IntRH", units="%"
+            ),  # Relative Humidity inside sensor housing
+            Variable(
+                "SnowVUE_Meta(4)", VarType.ALIAS, value="Pitch", units="deg"
+            ),  # Tilt (degrees) front to back
+            Variable(
+                "SnowVUE_Meta(5)", VarType.ALIAS, value="Roll", units="deg"
+            ),  # Tilt (degrees) side to side
+            Variable(
+                "SnowVUE_Meta(6)", VarType.ALIAS, value="SupVolt", units="v"
+            ),  # Voltage of supply from power source
+            Variable(
+                "SnowVUE_Meta(7)", VarType.ALIAS, value="ResFreq", units="kHz"
+            ),  # Resonate Frequency of Transducer
+            Variable(
+                "SnowVUE_Meta(8)", VarType.ALIAS, value="Alert", units="unitless"
+            ),  # Alert flag if ResFreq is out of tolerance
         ]
 
         self.dependencies = Dependencies(
             self,
-            Dependency("air_temp", "Air temperature to correct distance to ground measurement.")
+            Dependency(
+                "air_temp", "Air temperature to correct distance to ground measurement."
+            ),
         )
 
         return super().__post_init__()
-    
 
     @property
     def tables(self) -> list[Table]:
@@ -1487,68 +1580,132 @@ class Campbell_SnowVue10(Instrument):
                 card_out=CardOut(),
                 data_interval=DataInterval(0, 120, "min", 10),
             ),
-        ]    
-    
+        ]
+
     @property
     def pre_scan(self) -> str:
-        return "\n".join([
-            If(functions.FileSize("USR:Dist2Gnd.txt"), ">", 0, 
-               logic = "\n".join([
-                   f"{self.variables["FH"]} = {functions.FileOpen("USR:Dist2Gnd.txt", "r", 0)}",
-                   functions.FileRead(self.variables["FH"], self.variables["dummystr"],10),
-                   functions.SplitStr(self.variables["Dist2Gnd"],self.variables["dummystr"],"",1,0),
-                   functions.FileClose(self.variables['FH'])
-               ])).Else(
-                   f"{self.variables["Dist2Gnd"]} = 1.9"
-               )
-        ])
+        return "\n".join(
+            [
+                str(
+                    If(
+                        functions.FileSize("USR:Dist2Gnd.txt"),
+                        ">",
+                        0,
+                        logic="\n".join(
+                            [
+                                f"{self.variables['FH']} = {functions.FileOpen('USR:Dist2Gnd.txt', 'r', 0)}",
+                                functions.FileRead(
+                                    self.variables["FH"], self.variables["dummystr"], 10
+                                ),
+                                functions.SplitStr(
+                                    self.variables["Dist2Gnd"],
+                                    self.variables["dummystr"],
+                                    "",
+                                    1,
+                                    0,
+                                ),
+                                functions.FileClose(self.variables["FH"]),
+                            ]
+                        ),
+                    ).Else(f"{self.variables['Dist2Gnd']} = 1.9")
+                )
+            ]
+        )
 
     @property
     def program(self) -> str:
-        return "\n".join([
-            If(functions.IfTime(237, 300, "Sec"), logic=f"{self.variables["SnowVUE_Go"]} = True"),
-            If(self.variables["Set_D2G"], logic = f"{self.variables["SnowVUE_Go"]} = True")
-        ]) 
-    
+        return "\n".join(
+            [
+                str(
+                    If(
+                        functions.IfTime(237, 300, "Sec"),
+                        logic=f"{self.variables['SnowVUE_Go']} = True",
+                    )
+                ),
+                str(
+                    If(
+                        self.variables["Set_D2G"],
+                        logic=f"{self.variables['SnowVUE_Go']} = True",
+                    )
+                ),
+            ]
+        )
+
     @property
     def slow_sequence(self) -> SlowSequence:
         return SlowSequence(
             "Snow",
             Scan(1, "Min", 0, 0),
-            logic = "\n".join([If(
-                self.variables["SnowVUE_Go"],
-                logic = "\n".join([
-                    functions.SDI12Recorder(
-                        self.variables["SnowVUE(2)"].name.replace("2", ""), self.wires["White"], self.sdi12_address, "M1!", 1, 0, -1
+            logic="\n".join(
+                [
+                    str(
+                        If(
+                            self.variables["SnowVUE_Go"],
+                            logic="\n".join(
+                                [
+                                    functions.SDI12Recorder(
+                                        self.variables["SnowVUE(2)"].name.replace(
+                                            "2", ""
+                                        ),
+                                        self.wires["White"],
+                                        self.sdi12_address,
+                                        "M1!",
+                                        1,
+                                        0,
+                                        -1,
+                                    ),
+                                    functions.SDI12Recorder(
+                                        self.variables["SnowVUE_Meta(8)"].name.replace(
+                                            "8", ""
+                                        ),
+                                        self.wires["White"],
+                                        self.sdi12_address,
+                                        "M9!",
+                                        1,
+                                        0,
+                                        -1,
+                                    ),
+                                ]
+                            ),
+                        )
                     ),
-                    functions.SDI12Recorder(
-                        self.variables["SnowVUE_Meta(8)"].name.replace("8", ""), self.wires["White"], self.sdi12_address, "M9!", 1, 0, -1
-                    )
-                ])
+                    f"{self.variables['SnowVUE_Go']} = False",
+                    f"{self.variables['TCDT']} = {self.variables['Dist2Targ']}*{functions.Sqr(f'({self.dependencies["air_temp"].name}+273.15)/273.15')}",
+                    f"{self.variables['snow_depth']} = ({self.variables['Dist2Gnd']} - {self.variables['TCDT']}) * 100",
+                    str(
+                        If(
+                            self.variables["snow_depth"],
+                            "<",
+                            "0",
+                            logic=[
+                                f"{self.variables['snow_min']} = {self.variables['snow_depth']}",
+                                f"{self.variables['snow_depth']} = 0",
+                            ],
+                        )
+                    ),
+                    str(
+                        If(
+                            self.variables["Set_D2G"],
+                            logic=[
+                                f"{self.variables['Dist2Gnd']} = {self.variables['TCDT']}",
+                                f"{self.variables['FH']} = {functions.FileOpen('USR:Dist2Gnd.txt', 'w', 0)}",
+                                functions.Sprintf(
+                                    self.variables["dummystr"],
+                                    r"%f",
+                                    self.variables["Dist2Gnd"],
+                                ),
+                                functions.FileWrite(
+                                    self.variables["FH"], self.variables["dummystr"], 0
+                                ),
+                                functions.FileClose(self.variables["FH"]),
+                                f"{self.variables['Set_D2G']} = False",
+                            ],
+                        )
+                    ),
+                ]
             ),
-            f"{self.variables["SnowVUE_Go"]} = False",
-            f"{self.variables["TCDT"]} = {self.variables["Dist2Targ"]}*{functions.Sqr(f"({self.dependencies["air_temp"].name}+273.15)/273.15")}",
-            f"{self.variables['snow_depth']} = ({self.variables['Dist2Gnd']} - {self.variables['TCDT']}) * 100",
-            If(
-                self.variables['snow_depth'], "<", "0",
-                logic=[
-                    f"{self.variables['snow_min']} = {self.variables['snow_depth']}",
-                    f"{self.variables['snow_depth']} = 0",
-                ],
-            ),
-            If(
-                self.variables['Set_D2G'],
-                logic=[
-                    f"{self.variables['Dist2Gnd']} = {self.variables['TCDT']}",
-                    f'{self.variables["FH"]} = {functions.FileOpen("USR:Dist2Gnd.txt", "w", 0)}',
-                    functions.Sprintf(self.variables["dummystr"], r"%f", self.variables["Dist2Gnd"]),
-                    functions.FileWrite(self.variables["FH"], self.variables["dummystr"], 0),
-                    functions.FileClose(self.variables["FH"]),
-                    f"{self.variables['Set_D2G']} = False",
-                ],
-            )
-])
         )
+
 
 @dataclass
 class Apogee_SP510(Instrument):
@@ -1556,14 +1713,14 @@ class Apogee_SP510(Instrument):
     model: str = "SP-510 SS"
     type: str = "Pyranometer"
     _id: str = "apogee_sp510"
-    def __post_init__(self):
 
+    def __post_init__(self):
         self.wires = WiringDiagram(
             Wire("White", WireOptions.DIFF_2_H, "Signal Positive"),
             Wire("Black", WireOptions.DIFF_2_L, "Signal Negative"),
             Wire("Clear", WireOptions.AG, "Shield Ground"),
             Wire("Yellow", WireOptions._12V, "Fuse block 0.5A fuse heater"),
-            Wire("Blue", WireOptions.G, "Power ground for heater")
+            Wire("Blue", WireOptions.G, "Power ground for heater"),
         )
 
         self.variables = [
@@ -1575,8 +1732,9 @@ class Apogee_SP510(Instrument):
         self.dependencies = Dependencies(
             self,
             Dependency(
-                "pyran_calib", "Pyranometer calibration coefficient to correct radiation value."
-            )
+                "pyran_calib",
+                "Pyranometer calibration coefficient to correct radiation value.",
+            ),
         )
         return super().__post_init__()
 
@@ -1615,21 +1773,38 @@ class Apogee_SP510(Instrument):
                 data_interval=DataInterval(0, 120, "min", 10),
             ),
         ]
-    
+
     @property
     def pre_scan(self) -> str:
-        return f"{self.variables["pyran_calib"]} = {self.dependencies["pyran_calib"].value}"
+        return f"{self.variables['pyran_calib']} = {self.dependencies['pyran_calib'].value}"
 
-    @property 
+    @property
     def program(self) -> str:
-        return "\n".join([
-            functions.VoltDiff(self.variables["sol_rad"], 1, 'mv200', self.wires["White"], True, 0, "60", self.variables["pyran_calib"], 0),
-            If(self.variables["sol_rad"], "<", 0,
-               logic = [
-                   f"{self.variables["sol_min"]} = {self.variables["sol_rad"]}",
-                   f"{self.variables["sol_rad"]} = 0"
-               ])
-        ])
+        return "\n".join(
+            [
+                functions.VoltDiff(
+                    self.variables["sol_rad"],
+                    1,
+                    "mv200",
+                    self.wires["White"],
+                    True,
+                    0,
+                    "60",
+                    self.variables["pyran_calib"],
+                    0,
+                ),
+                If(
+                    self.variables["sol_rad"],
+                    "<",
+                    0,
+                    logic=[
+                        f"{self.variables['sol_min']} = {self.variables['sol_rad']}",
+                        f"{self.variables['sol_rad']} = 0",
+                    ],
+                ),
+            ]
+        )
+
 
 INSTRUMENTS = {
     RMYoung_05108_77._id: RMYoung_05108_77,
@@ -1642,7 +1817,7 @@ INSTRUMENTS = {
     CR1000X_PanelTemp._id: CR1000X_PanelTemp,
     EnviroCams_iPatrol._id: EnviroCams_iPatrol,
     EnviroCams_Scout._id: EnviroCams_Scout,
-    SparkFun_Door_Switch._id: SparkFun_Door_Switch, 
+    SparkFun_Door_Switch._id: SparkFun_Door_Switch,
     OTT_PLS500._id: OTT_PLS500,
     OTT_Pluvio._id: OTT_Pluvio,
     Sierra_RV50X._id: Sierra_RV50X,
