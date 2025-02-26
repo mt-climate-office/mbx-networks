@@ -407,6 +407,7 @@ class RMYoung_05108_77(Instrument):
             Variable("wind_spd", VarType.PUBLIC, units="m s-1"),
             Variable("wind_dir", VarType.PUBLIC, units="arcdeg"),
             Variable("wind_timer", VarType.PUBLIC, units="sec"),
+            Variable("windgust", VarType.FIELD_ONLY)
         ]
         return super().__post_init__()
 
@@ -440,7 +441,7 @@ class RMYoung_05108_77(Instrument):
                         False,
                         False,
                     ),
-                    field_names=["windgust"],
+                    field_names=[self.variables["windgust"]],
                 ),
                 size=-1,
                 data_interval=DataInterval(),
@@ -518,6 +519,7 @@ class RMYoung_09106(Instrument):
             Variable("wind_spd", VarType.PUBLIC, units="m s-1"),
             Variable("wind_dir", VarType.PUBLIC, units="arcdeg"),
             Variable("wind_timer", VarType.PUBLIC, units="sec"),
+            Variable("windgust", VarType.FIELD_ONLY)
         ]
         return super().__post_init__()
 
@@ -547,7 +549,7 @@ class RMYoung_09106(Instrument):
                     functions.Maximum(
                         1, self.variables["wind_spd"], "FP2", False, False
                     ),
-                    ["windgust"],
+                    [self.variables["windgust"]],
                 ),
             )
         ]

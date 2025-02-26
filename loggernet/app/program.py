@@ -9,6 +9,7 @@ from app.instruments import (
     Scan,
     SlowSequence,
 )
+from app.functions import VarType
 from typing import Callable, Literal
 from textwrap import indent
 
@@ -69,7 +70,7 @@ class Program:
                         f"More than one table named {table.name} exist, but have settings that don't match. Make sure that all tables named {table.name} share the same settings."
                     )
                 if table.name in tables:
-                    tables[table.name].args += table.args
+                    tables[table.name].table_items += table.table_items
                 else:
                     tables[table.name] = table
 
@@ -117,7 +118,8 @@ class Program:
 
         for i in self.instruments:
             for v in i.variables.values():
-                s += v.declaration_str() + "\n"
+                if v.var_type != VarType.FIELD_ONLY:
+                    s += v.declaration_str() + "\n"
 
         s += "\n"
         if self.preserve_variables:
@@ -174,8 +176,10 @@ class Program:
         return s
 
 
-def elev_sdi12_rename(i: Instrument, which: Literal["sdi12", "elevation", "both"]) -> None:
-    assert which in ["sdi12", "elevation", "both"], "'which' must be sdi12, elevation, or both."
+def elev_sdi12_rename(i: Instrument, which: Literal["sdi12", "elevation", "both", "none"]) -> None:
+    assert which in ["sdi12", "elevation", "both", "none"], "'which' must be sdi12, elevation, or both."
+    if which == "none":
+        return i
     pattern = r"\(\d+\)"
     for v in i.variables.values():
         # Only match if it is not an array.

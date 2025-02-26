@@ -101,7 +101,8 @@ async def build_program(
     for instrument in instruments:
         instance = INSTRUMENTS[instrument.name](
             elevation = instrument.elevation,
-            sdi12_address = instrument.sdi12_address
+            sdi12_address = instrument.sdi12_address,
+            transform=lambda x: elev_sdi12_rename(x, instrument.var_name_inclusion.lower())
         )
 
         if instance.wires:

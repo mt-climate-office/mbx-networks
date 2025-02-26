@@ -10,6 +10,7 @@ class VarType(Enum):
     CONST = "Const"
     DIM = "Dim"
     ALIAS = "Alias"
+    FIELD_ONLY = "Field"
 
     def __str__(self):
         return self.value
@@ -70,7 +71,13 @@ class Variable:
         return self.rename_to or self.name
 
     def declaration_str(self) -> str:
-        v_name = self.name if self.var_type != VarType.ALIAS else self.meta["orig_name"]
+
+        if self.var_type == VarType.FIELD_ONLY:
+            raise ValueError("declaration_str should not be called when Variable is of FIELD_ONLY type")
+        if self.var_type != VarType.ALIAS:
+            v_name = self.rename_to or self.name
+        else:
+            v_name = self.meta["orig_name"]
         out = f"{self.var_type} {v_name}"
 
         if self.var_type in [VarType.CONST, VarType.ALIAS]:
